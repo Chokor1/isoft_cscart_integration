@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include isoft_cscart_integration *.css
+recursive-include isoft_cscart_integration *.csv
+recursive-include isoft_cscart_integration *.html
+recursive-include isoft_cscart_integration *.ico
+recursive-include isoft_cscart_integration *.js
+recursive-include isoft_cscart_integration *.json
+recursive-include isoft_cscart_integration *.md
+recursive-include isoft_cscart_integration *.png
+recursive-include isoft_cscart_integration *.py
+recursive-include isoft_cscart_integration *.svg
+recursive-include isoft_cscart_integration *.txt
+recursive-exclude isoft_cscart_integration *.pyc
