@@ -13,6 +13,9 @@
  "roles": [
   {
    "role": "System Manager"
+  },
+  {
+   "role": "CSCart Manager"
   }
  ],
  "script": null,

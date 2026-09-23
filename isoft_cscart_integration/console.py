@@ -35,8 +35,33 @@ CHILD_FIELDS = {
 }
 
 
+MANAGER_ROLES = ("System Manager", "CSCart Manager")
+
+
 def _guard():
-	frappe.only_for("System Manager")
+	if not (set(MANAGER_ROLES) & set(frappe.get_roles())):
+		frappe.throw(_("You are not permitted to use the CS-Cart console."), frappe.PermissionError)
+
+
+LINK_FIELDS = {
+	"Item": "item_code", "Brand": "name", "Item Group": "name",
+	"Warehouse": "name", "Price List": "name",
+}
+
+
+@frappe.whitelist()
+def search_link(doctype, txt=None, limit=15):
+	"""Autocomplete for the console's pickers, gated by the console role so a
+	CSCart Manager needs no direct read permission on Item/Brand/etc."""
+	_guard()
+	field = LINK_FIELDS.get(doctype)
+	if not field:
+		frappe.throw(_("Not allowed"))
+	filters = {}
+	if txt:
+		filters[field] = ["like", "%" + str(txt).strip() + "%"]
+	return frappe.get_all(doctype, filters=filters, pluck=field, order_by=field,
+		limit_page_length=cint(limit) or 15)
 
 
 # ---------------------------------------------------------------------------

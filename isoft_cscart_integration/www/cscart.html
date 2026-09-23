@@ -280,10 +280,8 @@
 	function cleanMsg(m){ try{ const a=JSON.parse(m); if(Array.isArray(a)){ return a.map(x=>{try{return JSON.parse(x).message;}catch(e){return x;}}).join(" "); } }catch(e){} return String(m).replace(/<[^>]+>/g,""); }
 
 	async function searchLink(doctype, txt, field){
-		const filters = txt ? JSON.stringify([[doctype, field, "like", "%"+txt+"%"]]) : "[]";
-		const url = "/api/method/frappe.client.get_list?doctype="+encodeURIComponent(doctype)+"&filters="+encodeURIComponent(filters)+"&limit_page_length=15&order_by="+encodeURIComponent(field);
-		const r = await fetch(url,{credentials:"same-origin",headers:{"X-Frappe-CSRF-Token":window.CSRF}});
-		const d = await r.json(); return (d.message||[]).map(x=>x.name);
+		try{ return await api("search_link", { doctype, txt: txt||"", limit:15 }); }
+		catch(e){ return []; }
 	}
 
 	let toastT;

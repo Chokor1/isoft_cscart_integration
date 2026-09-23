@@ -57,7 +57,8 @@ app_license = "MIT"
 # ------------
 
 # before_install = "isoft_cscart_integration.install.before_install"
-# after_install = "isoft_cscart_integration.install.after_install"
+after_install = "isoft_cscart_integration.install.after_install"
+after_migrate = "isoft_cscart_integration.install.ensure_role"
 
 # Uninstallation
 # ------------

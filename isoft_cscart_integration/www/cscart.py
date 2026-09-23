@@ -19,7 +19,7 @@ def get_context(context):
 		frappe.local.flags.redirect_location = "/login?redirect-to=/cscart"
 		raise frappe.Redirect
 
-	if "System Manager" not in frappe.get_roles():
+	if not ({"System Manager", "CSCart Manager"} & set(frappe.get_roles())):
 		frappe.throw(_("You are not permitted to access the CS-Cart console."), frappe.PermissionError)
 
 	# get_csrf_token may generate + store a token, which needs a commit.
