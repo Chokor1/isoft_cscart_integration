@@ -1,0 +1,177 @@
+{
+ "actions": [],
+ "autoname": "format:CSL-{YYYY}-{#####}",
+ "creation": "2026-09-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sync_type",
+  "status",
+  "column_break_1",
+  "started_on",
+  "finished_on",
+  "duration_sec",
+  "section_counters",
+  "stock_changes",
+  "price_changes",
+  "price_held",
+  "disabled",
+  "column_break_2",
+  "created",
+  "failed",
+  "unmatched_erp_items",
+  "planned_changes",
+  "section_detail",
+  "changes",
+  "section_errors",
+  "errors"
+ ],
+ "fields": [
+  {
+   "fieldname": "sync_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sync Type",
+   "options": "Incremental\nFull\nMap Refresh"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Running\nSuccess\nPartial\nFailed\nDry Run\nAborted"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Started On"
+  },
+  {
+   "fieldname": "finished_on",
+   "fieldtype": "Datetime",
+   "label": "Finished On"
+  },
+  {
+   "fieldname": "duration_sec",
+   "fieldtype": "Float",
+   "label": "Duration (s)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "section_counters",
+   "fieldtype": "Section Break",
+   "label": "Counters"
+  },
+  {
+   "fieldname": "stock_changes",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Stock Changes"
+  },
+  {
+   "fieldname": "price_changes",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Price Changes"
+  },
+  {
+   "fieldname": "price_held",
+   "fieldtype": "Int",
+   "label": "Price Held"
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Int",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "created",
+   "fieldtype": "Int",
+   "label": "Created"
+  },
+  {
+   "fieldname": "failed",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Failed"
+  },
+  {
+   "fieldname": "unmatched_erp_items",
+   "fieldtype": "Int",
+   "label": "Unmatched ERP Items"
+  },
+  {
+   "fieldname": "planned_changes",
+   "fieldtype": "Int",
+   "label": "Planned Changes"
+  },
+  {
+   "fieldname": "section_detail",
+   "fieldtype": "Section Break",
+   "label": "Changes"
+  },
+  {
+   "fieldname": "changes",
+   "fieldtype": "Code",
+   "label": "Changes (JSON)",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "section_errors",
+   "fieldtype": "Section Break",
+   "label": "Errors"
+  },
+  {
+   "fieldname": "errors",
+   "fieldtype": "Code",
+   "label": "Errors",
+   "options": "Text"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Isoft CSCart Integration",
+ "name": "CSCart Sync Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

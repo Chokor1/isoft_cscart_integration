@@ -106,23 +106,16 @@ app_license = "MIT"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-#	"all": [
-#		"isoft_cscart_integration.tasks.all"
-#	],
-#	"daily": [
-#		"isoft_cscart_integration.tasks.daily"
-#	],
-#	"hourly": [
-#		"isoft_cscart_integration.tasks.hourly"
-#	],
-#	"weekly": [
-#		"isoft_cscart_integration.tasks.weekly"
-#	]
-#	"monthly": [
-#		"isoft_cscart_integration.tasks.monthly"
-#	]
-# }
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [
+			"isoft_cscart_integration.sync.scheduled_sync",
+		],
+	},
+	"daily": [
+		"isoft_cscart_integration.sync.cleanup_logs",
+	],
+}
 
 # Testing
 # -------

@@ -1,0 +1,148 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:product_id",
+ "creation": "2026-09-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "product_id",
+  "sku",
+  "sku_normalized",
+  "product_name",
+  "column_break_link",
+  "item_code",
+  "created_by_sync",
+  "section_site_values",
+  "cscart_status",
+  "cscart_amount",
+  "column_break_site",
+  "cscart_price",
+  "last_synced_on",
+  "section_error",
+  "last_error"
+ ],
+ "fields": [
+  {
+   "fieldname": "product_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "CS-Cart Product ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "SKU (product_code)",
+   "search_index": 1
+  },
+  {
+   "fieldname": "sku_normalized",
+   "fieldtype": "Data",
+   "label": "SKU Normalized",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "product_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Product Name (site)"
+  },
+  {
+   "fieldname": "column_break_link",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "ERPNext Item",
+   "options": "Item"
+  },
+  {
+   "default": "0",
+   "fieldname": "created_by_sync",
+   "fieldtype": "Check",
+   "label": "Created by Sync"
+  },
+  {
+   "fieldname": "section_site_values",
+   "fieldtype": "Section Break",
+   "label": "Last Known Site Values"
+  },
+  {
+   "fieldname": "cscart_status",
+   "fieldtype": "Data",
+   "label": "Site Status (A/D/H)"
+  },
+  {
+   "fieldname": "cscart_amount",
+   "fieldtype": "Int",
+   "label": "Site Amount"
+  },
+  {
+   "fieldname": "column_break_site",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cscart_price",
+   "fieldtype": "Float",
+   "label": "Site Price (excl. VAT)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "last_synced_on",
+   "fieldtype": "Datetime",
+   "label": "Last Synced On"
+  },
+  {
+   "fieldname": "section_error",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Isoft CSCart Integration",
+ "name": "CSCart Product Map",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

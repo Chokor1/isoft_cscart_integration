@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "autoname": "format:CPH-{#####}",
+ "creation": "2026-09-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "product_id",
+  "column_break_1",
+  "status",
+  "section_prices",
+  "old_price",
+  "new_price",
+  "column_break_2",
+  "change_pct"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "product_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "CS-Cart Product ID"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nApproved\nRejected"
+  },
+  {
+   "fieldname": "section_prices",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "old_price",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Old Price (site)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "new_price",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "New Price (ERP)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "change_pct",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Change %",
+   "precision": "2"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Isoft CSCart Integration",
+ "name": "CSCart Price Hold",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
