@@ -265,6 +265,8 @@
 	const API = "/api/method/isoft_cscart_integration.console.";
 	const esc = (s)=>String(s==null?"":s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 	const $ = (id)=>document.getElementById(id);
+	const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}};
+	const lsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
 
 	async function api(method, args, post){
 		let url = API + method;
@@ -557,23 +559,22 @@
 
 	// ---------------- products ----------------
 	function renderProducts(c){
+		const savedMode=lsGet("cscart_pm_mode","all");
+		const savedHide=lsGet("cscart_pm_hide_disabled","0")==="1";
+		State.pmMode=savedMode; State.pmHideDisabled=savedHide;
+		const seg=(m,l)=>'<button class="seg-b'+(m===savedMode?" on":"")+'" data-m="'+m+'">'+l+'</button>';
 		c.innerHTML=
 			'<div class="toolbar">'+
-				'<div class="seg" id="pmMode">'+
-					'<button class="seg-b on" data-m="all">All</button>'+
-					'<button class="seg-b" data-m="matched">Matched</button>'+
-					'<button class="seg-b" data-m="unmatched">Unmatched</button>'+
-					'<button class="seg-b" data-m="changes">Stock Δ</button>'+
-					'<button class="seg-b" data-m="missing">Missing on Site</button>'+
-				'</div>'+
-				'<input class="inp" id="pmSearch" style="max-width:220px" placeholder="Search SKU or Item…">'+
+				'<div class="seg" id="pmMode">'+seg("all","All")+seg("matched","Matched")+seg("unmatched","Unmatched")+seg("changes","Stock Δ")+seg("missing","Missing on Site")+'</div>'+
+				'<label class="check"><input type="checkbox" id="pmHide" '+(savedHide?"checked":"")+'> Hide disabled</label>'+
+				'<input class="inp" id="pmSearch" style="max-width:200px" placeholder="Search SKU or Item…">'+
 				'<button class="btn" id="pmFetch"><i class="fa-solid fa-cloud-arrow-down"></i> Fetch from website</button>'+
 				'<button class="btn" id="pmReload"><i class="fa-solid fa-rotate"></i> Reload</button>'+
 				'<span class="mut" id="pmCounts" style="margin-left:auto;font-size:.8rem"></span>'+
 			'</div><div id="pmBody"></div>';
-		State.pmMode="all";
 		$("pmFetch").onclick=async()=>{ try{ await api("refresh_map",{},true); toast("Fetching the catalogue from the website… this runs in the background, press Reload in a moment.","info"); setTimeout(runProducts,6000); }catch(e){ toast(e.message,"err"); } };
-		c.querySelectorAll("#pmMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#pmMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.pmMode=b.dataset.m; runProducts(); });
+		c.querySelectorAll("#pmMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#pmMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.pmMode=b.dataset.m; lsSet("cscart_pm_mode",State.pmMode); runProducts(); });
+		$("pmHide").onchange=(e)=>{ State.pmHideDisabled=e.target.checked; lsSet("cscart_pm_hide_disabled", e.target.checked?"1":"0"); runProducts(); };
 		$("pmReload").onclick=runProducts;
 		$("pmSearch").addEventListener("keydown",e=>{ if(e.key==="Enter") runProducts(); });
 		runProducts();
@@ -630,7 +631,7 @@
 		if((State.pmMode||"all")==="missing") return runMissing();
 		$("pmBody").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>';
 		try{
-			const m=await api("get_products",{ mode:State.pmMode||"all", search:$("pmSearch").value, limit:800 });
+			const m=await api("get_products",{ mode:State.pmMode||"all", search:$("pmSearch").value, limit:800, hide_disabled: State.pmHideDisabled?1:0 });
 			State.pmData=m;
 			const c=m.counts;
 			$("pmCounts").innerHTML=c.total+' products · <b class="ok-t">'+c.matched+'</b> matched · <b class="amber">'+c.unmatched+'</b> unmatched'+((m.source_names&&m.source_names.length)?' · <span class="mut">+'+m.source_names.length+' external source(s)</span>':(c.has_warehouses?"":' · <span class="amber">no stock source — ERP qty hidden</span>'));

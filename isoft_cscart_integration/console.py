@@ -200,15 +200,17 @@ def get_warehouses():
 
 
 @frappe.whitelist()
-def get_products(mode="all", search=None, limit=800):
+def get_products(mode="all", search=None, limit=800, hide_disabled=0):
 	"""Website products from the map with their ERP match + stock comparison.
 
 	mode: all | matched | unmatched | changes
+	hide_disabled: drop products disabled on the site (status D).
 	"""
 	_guard()
 	s = frappe.get_single(SETTINGS_DT)
 	search = (search or "").strip().upper()
 	limit = cint(limit) or 800
+	hide_disabled = cint(hide_disabled)
 
 	items = erp.eligible_items(s)
 	norm_to_item = {m["sku_normalized"]: c for c, m in items.items() if m["sku_normalized"]}
@@ -259,6 +261,8 @@ def get_products(mode="all", search=None, limit=800):
 		})
 
 	def keep(row):
+		if hide_disabled and row["site_status"] == "D":
+			return False
 		if mode == "matched" and not row["matched"]:
 			return False
 		if mode == "unmatched" and row["matched"]:
