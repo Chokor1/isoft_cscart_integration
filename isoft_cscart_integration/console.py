@@ -83,6 +83,8 @@ def get_state():
 		"verify_ssl": r.verify_ssl, "secret_set": bool(r.api_secret),
 		"scope_items": r.scope_items, "scope_brands": r.scope_brands,
 		"scope_item_groups": r.scope_item_groups,
+		"exclude_items": r.exclude_items, "exclude_brands": r.exclude_brands,
+		"exclude_item_groups": r.exclude_item_groups,
 	} for r in (s.external_sources or [])]
 
 	settings["last_sync_on"] = s.last_sync_on
@@ -415,6 +417,9 @@ def save_settings(payload):
 				"scope_items": row.get("scope_items"),
 				"scope_brands": row.get("scope_brands"),
 				"scope_item_groups": row.get("scope_item_groups"),
+				"exclude_items": row.get("exclude_items"),
+				"exclude_brands": row.get("exclude_brands"),
+				"exclude_item_groups": row.get("exclude_item_groups"),
 			})
 
 	s.save(ignore_permissions=True)

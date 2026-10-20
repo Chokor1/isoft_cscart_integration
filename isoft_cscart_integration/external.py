@@ -180,27 +180,41 @@ def _lines(value):
 
 def source_scope(src, items_meta=None):
 	"""Return a predicate(item_code)->bool limiting where the source applies,
-	or None if the source has no item/brand/group scope. Brand and item-group
-	scope need `items_meta` (item_code -> {brand, item_group}); item-code scope
-	works without it."""
+	or None if the source has no include/exclude filters. "Only" lists restrict
+	(AND across dimensions); "Except" lists remove (any match drops the item).
+	Brand/group filters need `items_meta` (item_code -> {brand, item_group})."""
 	items = set(_lines(src.get("scope_items")))
 	brands = set(_lines(src.get("scope_brands")))
 	groups = _lines(src.get("scope_item_groups"))
-	if not (items or brands or groups):
+	x_items = set(_lines(src.get("exclude_items")))
+	x_brands = set(_lines(src.get("exclude_brands")))
+	x_groups = _lines(src.get("exclude_item_groups"))
+	if not (items or brands or groups or x_items or x_brands or x_groups):
 		return None
 
-	group_set = set()
-	if groups and items_meta:
+	expand = None
+	if (groups or x_groups) and items_meta:
 		from isoft_cscart_integration import erp
-		group_set = set(erp.expand_item_groups(groups))
+		expand = erp.expand_item_groups
+	group_set = set(expand(groups)) if (groups and expand) else set()
+	x_group_set = set(expand(x_groups)) if (x_groups and expand) else set()
 
 	def ok(code):
+		meta = (items_meta or {}).get(code) or {}
+		brand, grp = meta.get("brand"), meta.get("item_group")
+		# include ("Only ...") — AND across whatever is set
 		if items and code not in items:
 			return False
-		meta = (items_meta or {}).get(code) or {}
-		if brands and items_meta and meta.get("brand") not in brands:
+		if brands and items_meta and brand not in brands:
 			return False
-		if groups and items_meta and meta.get("item_group") not in group_set:
+		if groups and items_meta and grp not in group_set:
+			return False
+		# exclude ("Except ...") — any match removes
+		if code in x_items:
+			return False
+		if x_brands and items_meta and brand in x_brands:
+			return False
+		if x_groups and items_meta and grp in x_group_set:
 			return False
 		return True
 

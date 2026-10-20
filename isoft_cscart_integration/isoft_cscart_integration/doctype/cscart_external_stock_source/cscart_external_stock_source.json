@@ -18,7 +18,10 @@
   "warehouses",
   "scope_items",
   "scope_brands",
-  "scope_item_groups"
+  "scope_item_groups",
+  "exclude_items",
+  "exclude_brands",
+  "exclude_item_groups"
  ],
  "fields": [
   {
@@ -101,6 +104,21 @@
    "fieldname": "scope_item_groups",
    "fieldtype": "Small Text",
    "label": "Only Item Groups (optional, one per line; includes sub-groups)"
+  },
+  {
+   "fieldname": "exclude_items",
+   "fieldtype": "Small Text",
+   "label": "Except Items (optional, one item code per line)"
+  },
+  {
+   "fieldname": "exclude_brands",
+   "fieldtype": "Small Text",
+   "label": "Except Brands (optional, one per line)"
+  },
+  {
+   "fieldname": "exclude_item_groups",
+   "fieldtype": "Small Text",
+   "label": "Except Item Groups (optional, one per line; includes sub-groups)"
   }
  ],
  "index_web_pages_for_search": 1,
