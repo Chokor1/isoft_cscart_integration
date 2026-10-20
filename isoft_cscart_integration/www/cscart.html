@@ -467,15 +467,14 @@
 				'<div class="fld"><label>&nbsp;</label><label class="sw"><input type="checkbox" data-ext="'+i+'.verify_ssl" '+(r.verify_ssl?"checked":"")+'><span class="t"></span>Verify SSL</label></div>'+
 			'</div>'+
 			'<div class="mut" style="font-size:.74rem;margin-top:8px">Stylus → Base URL <b>https://externalapi.stylus.co.ao</b> · API Key = login · API Secret = password · Remote Warehouses ignored. Matches by ProductCode = Item Code.</div>'+
-			'<div class="ext-scope"><div class="ext-scope-h">Include only <span class="mut">(optional — blank = whole catalogue)</span></div><div class="ext-grid">'+
+			'<div class="ext-scope"><div class="ext-scope-h">Filters <span class="mut">(optional — "Only" narrows · "Except" removes · combine any)</span></div>'+
+			'<div class="ext-grid" style="grid-template-columns:repeat(auto-fill,minmax(175px,1fr))">'+
 				fldWrap("Only Items",'<div class="ms" data-extms="'+i+'|scope_items|Item|item_code"><input placeholder="search items…"><div class="ms-drop"></div></div>')+
-				fldWrap("Only Brands",'<div class="ms" data-extms="'+i+'|scope_brands|Brand|name"><input placeholder="search brands…"><div class="ms-drop"></div></div>')+
-				fldWrap("Only Item Groups",'<div class="ms" data-extms="'+i+'|scope_item_groups|Item Group|name"><input placeholder="search item groups… (includes sub-groups)"><div class="ms-drop"></div></div>')+
-			'</div>'+
-			'<div class="ext-scope-h" style="margin-top:12px">Exclude <span class="mut">(optional — never taken from this source)</span></div><div class="ext-grid">'+
 				fldWrap("Except Items",'<div class="ms" data-extms="'+i+'|exclude_items|Item|item_code"><input placeholder="search items…"><div class="ms-drop"></div></div>')+
+				fldWrap("Only Brands",'<div class="ms" data-extms="'+i+'|scope_brands|Brand|name"><input placeholder="search brands…"><div class="ms-drop"></div></div>')+
 				fldWrap("Except Brands",'<div class="ms" data-extms="'+i+'|exclude_brands|Brand|name"><input placeholder="search brands…"><div class="ms-drop"></div></div>')+
-				fldWrap("Except Item Groups",'<div class="ms" data-extms="'+i+'|exclude_item_groups|Item Group|name"><input placeholder="search item groups… (includes sub-groups)"><div class="ms-drop"></div></div>')+
+				fldWrap("Only Item Groups",'<div class="ms" data-extms="'+i+'|scope_item_groups|Item Group|name"><input placeholder="search groups… (incl. sub)"><div class="ms-drop"></div></div>')+
+				fldWrap("Except Item Groups",'<div class="ms" data-extms="'+i+'|exclude_item_groups|Item Group|name"><input placeholder="search groups… (incl. sub)"><div class="ms-drop"></div></div>')+
 			'</div></div>'+
 			'<div class="ext-status" data-ext-status="'+i+'"></div></div>';
 	}
