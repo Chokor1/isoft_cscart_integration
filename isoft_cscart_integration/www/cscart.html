@@ -156,8 +156,8 @@
 	.tbl th.sortable:hover{color:var(--accent-ink);}
 	.tbl th.sorted{color:var(--accent-ink);}
 	.tbl td.strong{font-weight:700;color:var(--ink);}
-	.tbl .filter-row th{position:sticky;top:0;z-index:4;padding:5px 8px;text-transform:none;background:var(--surface-2);border-bottom:1px solid var(--line-2);}
-	.tbl thead tr:not(.filter-row) th{top:34px;}
+	.tbl .filter-row th{position:sticky;top:36px;z-index:3;padding:5px 8px;text-transform:none;background:var(--surface);border-bottom:1px solid var(--line);}
+	.tbl thead tr:not(.filter-row) th{top:0;z-index:4;}
 	input.col-f{width:100%;min-width:54px;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:.73rem;font-weight:400;background:var(--surface);color:var(--ink);}
 	input.col-f::placeholder{color:var(--muted);font-weight:400;}
 	input.col-f:focus{outline:none;border-color:var(--accent);}
@@ -636,7 +636,7 @@
 			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>';
 		const filterRow='<tr class="filter-row">'+cols.map(c=>'<th'+(c.num?' class="num"':'')+'><input class="col-f" data-f="'+c.k+'" value="'+esc(State.pmFilters[c.k]||"")+'" placeholder="filter"></th>').join("")+'</tr>';
 		const headRow='<tr>'+cols.map(c=>{ const a=sort.k===c.k; return '<th class="'+(c.num?"num ":"")+'sortable'+(a?" sorted":"")+'" data-sort="'+c.k+'">'+esc(c.l)+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
-		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+filterRow+headRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
+		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
 		$("pmBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; if(State.pmSort.k===k)State.pmSort.dir*=-1; else State.pmSort={k,dir:1}; renderProductTable(); });
 		$("pmBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.pmFilters[inp.dataset.f]=inp.value; const tb=$("pmBody").querySelector("tbody"); if(tb) tb.innerHTML=buildBody(view()); });
 	}
@@ -722,7 +722,7 @@
 			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
 		const filterRow='<tr class="filter-row">'+cols.map(col=>'<th'+(["num","money","signed"].indexOf(col[2])>=0?' class="num"':'')+'><input class="col-f" data-f="'+col[0]+'" value="'+esc(State.syFilters[col[0]]||"")+'" placeholder="filter"></th>').join("")+'</tr>';
 		const headRow='<tr>'+cols.map(col=>{ const a=sort.k===col[0]; return '<th class="sortable'+(["num","money","signed"].indexOf(col[2])>=0?" num":"")+(a?" sorted":"")+'" data-k="'+col[0]+'">'+col[1]+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
-		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+filterRow+headRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
+		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
 		$("syBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(State.sySort.k===k)State.sySort.dir*=-1; else State.sySort={k,dir:1}; renderStylusTable(); });
 		$("syBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.syFilters[inp.dataset.f]=inp.value; const tb=$("syBody").querySelector("tbody"); if(tb) tb.innerHTML=buildBody(view()); });
 	}
