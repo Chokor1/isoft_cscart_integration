@@ -156,6 +156,11 @@
 	.tbl th.sortable:hover{color:var(--accent-ink);}
 	.tbl th.sorted{color:var(--accent-ink);}
 	.tbl td.strong{font-weight:700;color:var(--ink);}
+	.tbl .filter-row th{position:sticky;top:0;z-index:4;padding:5px 8px;text-transform:none;background:var(--surface-2);border-bottom:1px solid var(--line-2);}
+	.tbl thead tr:not(.filter-row) th{top:34px;}
+	input.col-f{width:100%;min-width:54px;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font-size:.73rem;font-weight:400;background:var(--surface);color:var(--ink);}
+	input.col-f::placeholder{color:var(--muted);font-weight:400;}
+	input.col-f:focus{outline:none;border-color:var(--accent);}
 	.mut{color:var(--muted);} .diff{color:var(--accent);font-weight:700;} .amber{color:var(--amber);font-weight:600;}
 	.row-un{background:#fffbeb;}
 	.badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;background:#eef2f7;color:#475569;}
@@ -615,25 +620,25 @@
 		const m=State.pmData; if(!m) return;
 		const cols=productColumns();
 		const sort=State.pmSort||(State.pmSort={k:null,dir:1});
-		let rows=(m.rows||[]).slice();
-		if(sort.k){
-			const col=cols.find(c=>c.k===sort.k);
-			if(col) rows.sort((a,b)=>{ let x=col.g(a),y=col.g(b);
-				if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1;
-				if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; }
-				return (x-y)*sort.dir; });
-		}
+		State.pmFilters=State.pmFilters||{};
+		const byKey={}; cols.forEach(c=>byKey[c.k]=c);
 		const cell=(c,r)=>{ let v=c.g(r);
 			if(c.badge) return '<td><span class="badge b-'+esc(r.site_status)+'">'+esc(r.site_status||"?")+'</span></td>';
 			if(c.tag) return '<td>'+(r.matched?'<span class="tag-ok">'+esc(r.item_code)+'</span>':'<span class="tag-no">unmatched</span>')+'</td>';
 			let disp = c.money?pmMoney(v) : c.signed?pmSigned(v) : (v==null?"—":esc(c.cut?String(v).slice(0,c.cut):v));
 			const cls=((c.num?"num ":"")+(c.cls||"")+((c.diff&&v)?" diff":"")+(c.strong?" strong":"")).trim();
 			return '<td'+(cls?' class="'+cls+'"':'')+'>'+disp+'</td>'; };
-		const thead='<tr>'+cols.map(c=>{ const a=sort.k===c.k; return '<th class="'+(c.num?"num ":"")+'sortable'+(a?" sorted":"")+'" data-sort="'+c.k+'">'+esc(c.l)+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
-		const tbody=rows.map(r=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>').join("")
-			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No products yet — press <b>Refresh Map</b> to pull the catalogue.</td></tr>';
-		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+		const view=()=>{ let rows=(m.rows||[]).slice();
+			Object.keys(State.pmFilters).forEach(k=>{ const t=(State.pmFilters[k]||"").trim().toLowerCase(); if(!t)return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>{ const v=c.g(r); return v!=null && String(v).toLowerCase().indexOf(t)>=0; }); });
+			if(sort.k){ const col=byKey[sort.k]; if(col) rows.sort((a,b)=>{ let x=col.g(a),y=col.g(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; }); }
+			return rows; };
+		const buildBody=(rows)=>rows.map(r=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>').join("")
+			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>';
+		const filterRow='<tr class="filter-row">'+cols.map(c=>'<th'+(c.num?' class="num"':'')+'><input class="col-f" data-f="'+c.k+'" value="'+esc(State.pmFilters[c.k]||"")+'" placeholder="filter"></th>').join("")+'</tr>';
+		const headRow='<tr>'+cols.map(c=>{ const a=sort.k===c.k; return '<th class="'+(c.num?"num ":"")+'sortable'+(a?" sorted":"")+'" data-sort="'+c.k+'">'+esc(c.l)+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
+		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+filterRow+headRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
 		$("pmBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; if(State.pmSort.k===k)State.pmSort.dir*=-1; else State.pmSort={k,dir:1}; renderProductTable(); });
+		$("pmBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.pmFilters[inp.dataset.f]=inp.value; const tb=$("pmBody").querySelector("tbody"); if(tb) tb.innerHTML=buildBody(view()); });
 	}
 	async function runProducts(){
 		if((State.pmMode||"all")==="missing") return runMissing();
@@ -680,7 +685,7 @@
 				'<button class="btn" id="sySnap"><i class="fa-solid fa-camera"></i> Snapshot now</button>'+
 				'<span class="mut" id="syInfo" style="margin-left:auto;font-size:.8rem"></span>'+
 			'</div><div id="syBody"></div>';
-		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; lsSet("cscart_sy_view",State.syView); runStylus(); });
+		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; lsSet("cscart_sy_view",State.syView); runStylus(); });
 		$("sySnap").onclick=async()=>{ try{ await api("snapshot_stylus_now",{},true); toast("Stylus snapshot queued — press Reload in a moment.","info"); setTimeout(runStylus,6000); }catch(e){ toast(e.message,"err"); } };
 		$("syReload").onclick=runStylus;
 		$("sySearch").addEventListener("keydown",e=>{ if(e.key==="Enter") runStylus(); });
@@ -701,11 +706,7 @@
 	function renderStylusTable(){
 		const cols=SY_COLS[State.syView||"catalogue"];
 		const sort=State.sySort||(State.sySort={k:null,dir:1});
-		let rows=(State.syRows||[]).slice();
-		if(sort.k) rows.sort((a,b)=>{ let x=a[sort.k],y=b[sort.k];
-			if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1;
-			if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; }
-			return (x-y)*sort.dir; });
+		State.syFilters=State.syFilters||{};
 		const cell=(col,r)=>{ const t=col[2]; const v=r[col[0]];
 			if(t==="status") return '<td><span class="badge '+(v?"b-A":"b-D")+'">'+(v?"Active":"Inactive")+'</span></td>';
 			if(t==="money") return '<td class="num">'+pmMoney(v)+'</td>';
@@ -713,11 +714,17 @@
 			if(t==="num") return '<td class="num">'+(v==null?"—":v)+'</td>';
 			if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
 			return '<td>'+esc(v==null?"":v)+'</td>'; };
-		const head='<tr>'+cols.map(col=>{ const a=sort.k===col[0]; return '<th class="sortable'+(["num","money","signed"].indexOf(col[2])>=0?" num":"")+(a?" sorted":"")+'" data-k="'+col[0]+'">'+col[1]+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
-		const body=rows.map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
+		const view=()=>{ let rows=(State.syRows||[]).slice();
+			Object.keys(State.syFilters).forEach(k=>{ const t=(State.syFilters[k]||"").trim().toLowerCase(); if(!t)return; rows=rows.filter(r=>{ const v=r[k]; return v!=null && String(v).toLowerCase().indexOf(t)>=0; }); });
+			if(sort.k) rows.sort((a,b)=>{ let x=a[sort.k],y=b[sort.k]; if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; });
+			return rows; };
+		const buildBody=(rows)=>rows.map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
 			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
-		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+		const filterRow='<tr class="filter-row">'+cols.map(col=>'<th'+(["num","money","signed"].indexOf(col[2])>=0?' class="num"':'')+'><input class="col-f" data-f="'+col[0]+'" value="'+esc(State.syFilters[col[0]]||"")+'" placeholder="filter"></th>').join("")+'</tr>';
+		const headRow='<tr>'+cols.map(col=>{ const a=sort.k===col[0]; return '<th class="sortable'+(["num","money","signed"].indexOf(col[2])>=0?" num":"")+(a?" sorted":"")+'" data-k="'+col[0]+'">'+col[1]+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
+		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+filterRow+headRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
 		$("syBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(State.sySort.k===k)State.sySort.dir*=-1; else State.sySort={k,dir:1}; renderStylusTable(); });
+		$("syBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.syFilters[inp.dataset.f]=inp.value; const tb=$("syBody").querySelector("tbody"); if(tb) tb.innerHTML=buildBody(view()); });
 	}
 
 	// ---------------- logs ----------------
