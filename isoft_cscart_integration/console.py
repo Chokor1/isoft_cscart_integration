@@ -78,7 +78,7 @@ def get_state():
 		settings[field] = [row.get(link) for row in (s.get(field) or [])]
 
 	settings["external_sources"] = [{
-		"source_name": r.source_name, "enabled": r.enabled, "base_url": r.base_url,
+		"source_name": r.source_name, "source_type": r.source_type or "ERPNext", "enabled": r.enabled, "base_url": r.base_url,
 		"api_key": r.api_key, "warehouses": r.warehouses, "merge_mode": r.merge_mode,
 		"verify_ssl": r.verify_ssl, "secret_set": bool(r.api_secret),
 		"scope_items": r.scope_items, "scope_brands": r.scope_brands,
@@ -183,6 +183,83 @@ def test_external_source(payload):
 		"total_qty": round(sum(data.values()), 2),
 		"sample": list(data.items())[:5],
 	}
+
+
+def _sy_search(rows, txt, keys):
+	if not txt:
+		return rows
+	return [r for r in rows if any(txt in (r.get(k) or "").upper() for k in keys)]
+
+
+@frappe.whitelist()
+def get_stylus(view="catalogue", search=None, limit=1000):
+	"""Stylus views off the latest snapshot:
+	catalogue | vs_erp | not_in_erp | movement (vs previous snapshot)."""
+	_guard()
+	from isoft_cscart_integration import stylus
+	snap = stylus.latest_snapshot()
+	if not snap:
+		return {"rows": [], "taken_on": None, "total": 0}
+	name = snap["name"]
+	search = (search or "").strip().upper()
+	limit = cint(limit) or 1000
+
+	if view == "movement":
+		prev = frappe.get_all("CSCart Stylus Snapshot", filters={"name": ["!=", name]},
+			order_by="creation desc", limit=1, fields=["name", "taken_on"])
+		if not prev:
+			return {"rows": [], "taken_on": str(snap["taken_on"]), "total": 0,
+				"note": "Only one snapshot so far — movement needs at least two."}
+		rows = frappe.db.sql("""
+			select a.code, a.designation,
+			       b.stock as old_stock, a.stock as new_stock, (a.stock-b.stock) as delta,
+			       b.price as old_price, a.price as new_price
+			from `tabCSCart Stylus Snapshot Item` a
+			join `tabCSCart Stylus Snapshot Item` b on b.code=a.code and b.parent=%(prev)s
+			where a.parent=%(cur)s and (a.stock != b.stock or a.price != b.price)
+			order by abs(a.stock-b.stock) desc, abs(a.price-b.price) desc
+		""", {"cur": name, "prev": prev[0].name}, as_dict=True)
+		rows = _sy_search(rows, search, ("code", "designation"))
+		return {"rows": rows[:limit], "taken_on": str(prev[0].taken_on), "total": len(rows)}
+
+	items = frappe.get_all("CSCart Stylus Snapshot Item", filters={"parent": name},
+		fields=["code", "designation", "brand", "family", "price", "stock", "is_active"],
+		order_by="code asc", limit_page_length=0)
+
+	if view in ("vs_erp", "not_in_erp"):
+		s = frappe.get_single(SETTINGS_DT)
+		erp_codes = set(frappe.get_all("Item", pluck="item_code"))
+		local = erp.local_raw_quantities(s)
+		prices = erp.erp_prices(s, {}) if s.price_list else {}
+		rows = []
+		for it in items:
+			matched = it.code in erp_codes
+			if view == "vs_erp" and not matched:
+				continue
+			if view == "not_in_erp" and matched:
+				continue
+			erp_qty = int(flt(local.get(it.code, 0))) if matched else None
+			erp_price = prices.get(it.code) if matched else None
+			rows.append({
+				"code": it.code, "designation": it.designation, "brand": it.brand,
+				"stylus_stock": it.stock, "erp_qty": erp_qty,
+				"qty_diff": (it.stock - erp_qty) if erp_qty is not None else None,
+				"stylus_price": it.price, "erp_price": erp_price,
+				"price_diff": round(it.price - erp_price, 2) if erp_price else None,
+			})
+		rows = _sy_search(rows, search, ("code", "designation", "brand"))
+		return {"rows": rows[:limit], "taken_on": str(snap["taken_on"]), "total": len(rows)}
+
+	rows = _sy_search([dict(it) for it in items], search, ("code", "designation", "brand"))
+	return {"rows": rows[:limit], "taken_on": str(snap["taken_on"]), "total": len(rows)}
+
+
+@frappe.whitelist()
+def snapshot_stylus_now():
+	_guard()
+	frappe.enqueue("isoft_cscart_integration.stylus.snapshot_stylus", queue="long",
+		timeout=600, job_name="cscart_stylus_snapshot")
+	return {"queued": True}
 
 
 @frappe.whitelist()
@@ -326,6 +403,7 @@ def save_settings(payload):
 			secret = row.get("api_secret") or old_secrets.get(row.get("source_name"))
 			s.append("external_sources", {
 				"source_name": row.get("source_name"),
+				"source_type": row.get("source_type") or "ERPNext",
 				"enabled": 1 if row.get("enabled") else 0,
 				"base_url": row.get("base_url"),
 				"api_key": row.get("api_key"),

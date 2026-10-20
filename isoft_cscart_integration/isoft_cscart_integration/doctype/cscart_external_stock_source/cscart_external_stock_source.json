@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "source_name",
+  "source_type",
   "enabled",
   "base_url",
   "column_break_1",
@@ -26,6 +27,14 @@
    "in_list_view": 1,
    "label": "Source Name",
    "reqd": 1
+  },
+  {
+   "default": "ERPNext",
+   "fieldname": "source_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Source Type",
+   "options": "ERPNext\nStylus"
   },
   {
    "default": "1",

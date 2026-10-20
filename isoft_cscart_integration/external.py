@@ -33,6 +33,7 @@ def _source_config(src):
 		get = src.get
 	return {
 		"source_name": get("source_name"),
+		"source_type": get("source_type") or "ERPNext",
 		"base_url": (get("base_url") or "").strip().rstrip("/"),
 		"api_key": (get("api_key") or "").strip(),
 		"api_secret": secret,
@@ -42,12 +43,48 @@ def _source_config(src):
 	}
 
 
-def fetch_source_qty(cfg):
-	"""Return {item_code: qty} summed from the remote site's Bin.
+def fetch_stylus_rows(cfg):
+	"""Return [{code, designation, brand, family, price, stock, is_active}] from
+	the Stylus external API (ProductCode == ERP item_code)."""
+	if not (cfg["base_url"] and cfg["api_key"] and cfg["api_secret"]):
+		raise ValueError("Stylus source needs base URL, login and password.")
+	resp = requests.get(
+		cfg["base_url"] + "/api/StylusExternalClients/GetProductsInfo?code=",
+		auth=(cfg["api_key"], cfg["api_secret"]),
+		headers={"Accept": "application/json"},
+		timeout=90, verify=cfg["verify_ssl"],
+	)
+	if resp.status_code != 200:
+		raise ValueError("Stylus returned HTTP {0}: {1}".format(resp.status_code, (resp.text or "")[:160]))
+	data = resp.json()
+	if not isinstance(data, list):
+		raise ValueError("Unexpected Stylus response (not a list).")
+	out = []
+	for r in data:
+		code = (r.get("ProductCode") or "").strip()
+		if not code:
+			continue
+		out.append({
+			"code": code,
+			"designation": r.get("ProductDesignation"),
+			"brand": (r.get("Marca") or {}).get("Brand"),
+			"family": (r.get("Familias") or {}).get("Family"),
+			"price": flt(r.get("ProductPrice")),
+			"stock": flt(r.get("QuantityAvailable")),
+			"is_active": 1 if r.get("IsActive") else 0,
+		})
+	return out
 
-	`cfg` is a normalised dict from _source_config (base_url, api_key, api_secret
-	plaintext, warehouses list, verify_ssl).
+
+def fetch_source_qty(cfg):
+	"""Return {item_code: qty} for the source. ERPNext sums its Bin; Stylus
+	reads QuantityAvailable per ProductCode.
+
+	`cfg` is a normalised dict from _source_config.
 	"""
+	if cfg.get("source_type") == "Stylus":
+		return {r["code"]: r["stock"] for r in fetch_stylus_rows(cfg)}
+
 	if not (cfg["base_url"] and cfg["api_key"] and cfg["api_secret"]):
 		raise ValueError("External source needs base URL, API key and secret.")
 

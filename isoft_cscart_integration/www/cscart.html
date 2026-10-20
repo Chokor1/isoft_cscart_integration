@@ -294,6 +294,7 @@
 	const TABS = [
 		["dashboard","fa-gauge-high","Dashboard","CS-Cart storefront integration"],
 		["products","fa-boxes-stacked","Products","Website items · matched to ERP · stock"],
+		["stylus","fa-industry","Stylus","Stylus catalogue · stock & price"],
 		["settings","fa-sliders","Settings","Connection, stock source and filters"],
 		["logs","fa-rectangle-list","Logs","Every sync run"],
 	];
@@ -330,6 +331,7 @@
 		const c = $("canvas"); c.style.animation="none"; c.offsetHeight; c.style.animation="";
 		if(State.tab==="dashboard") renderDash(c);
 		else if(State.tab==="products") renderProducts(c);
+		else if(State.tab==="stylus") renderStylus(c);
 		else if(State.tab==="settings") renderSettings(c);
 		else if(State.tab==="logs") renderLogs(c);
 	}
@@ -423,9 +425,9 @@
 	function fldWrap(label,inner,wide){ return '<div class="fld'+(wide?" wide":"")+'"><label>'+esc(label)+'</label>'+inner+'</div>'; }
 	function initExtSources(rows){
 		const toArr=(v)=>Array.isArray(v)?v:String(v||"").split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
-		State.ext=(rows||[]).map(r=>({source_name:r.source_name||"",enabled:r.enabled?1:0,base_url:r.base_url||"",api_key:r.api_key||"",api_secret:"",secret_set:!!r.secret_set,warehouses:r.warehouses||"",merge_mode:r.merge_mode||"Add on top",verify_ssl:r.verify_ssl?1:0,scope_items:toArr(r.scope_items),scope_brands:toArr(r.scope_brands),scope_item_groups:toArr(r.scope_item_groups)}));
+		State.ext=(rows||[]).map(r=>({source_name:r.source_name||"",source_type:r.source_type||"ERPNext",enabled:r.enabled?1:0,base_url:r.base_url||"",api_key:r.api_key||"",api_secret:"",secret_set:!!r.secret_set,warehouses:r.warehouses||"",merge_mode:r.merge_mode||"Add on top",verify_ssl:r.verify_ssl?1:0,scope_items:toArr(r.scope_items),scope_brands:toArr(r.scope_brands),scope_item_groups:toArr(r.scope_item_groups)}));
 		drawExt();
-		document.querySelector("[data-ext-add]").onclick=()=>{ syncExtFromDom(); State.ext.push({source_name:"",enabled:1,base_url:"",api_key:"",api_secret:"",secret_set:false,warehouses:"",merge_mode:"Add on top",verify_ssl:1,scope_items:[],scope_brands:[],scope_item_groups:[]}); drawExt(); };
+		document.querySelector("[data-ext-add]").onclick=()=>{ syncExtFromDom(); State.ext.push({source_name:"",source_type:"ERPNext",enabled:1,base_url:"",api_key:"",api_secret:"",secret_set:false,warehouses:"",merge_mode:"Add on top",verify_ssl:1,scope_items:[],scope_brands:[],scope_item_groups:[]}); drawExt(); };
 	}
 	function drawExt(){
 		const box=document.getElementById("extRows"); if(!box) return;
@@ -453,16 +455,18 @@
 		return '<div class="ext-card">'+
 			'<div class="ext-top"><label class="sw"><input type="checkbox" data-ext="'+i+'.enabled" '+(r.enabled?"checked":"")+'><span class="t"></span>Enabled</label>'+
 				'<input class="inp ext-name" data-ext="'+i+'.source_name" value="'+esc(r.source_name)+'" placeholder="Source name">'+
+				'<select class="sel" data-ext="'+i+'.source_type" style="max-width:130px">'+["ERPNext","Stylus"].map(o=>'<option '+((r.source_type||"ERPNext")===o?"selected":"")+'>'+o+'</option>').join("")+'</select>'+
 				'<button class="btn mini" data-ext-test="'+i+'"><i class="fa-solid fa-plug"></i> Test</button>'+
 				'<button class="btn mini no" data-ext-del="'+i+'"><i class="fa-solid fa-trash"></i></button></div>'+
 			'<div class="ext-grid">'+
 				fldWrap("Base URL",'<input class="inp" data-ext="'+i+'.base_url" value="'+esc(r.base_url)+'" placeholder="https://other-erp.example.com">')+
-				fldWrap("API Key",'<input class="inp" data-ext="'+i+'.api_key" value="'+esc(r.api_key)+'">')+
-				fldWrap("API Secret",'<input class="inp" type="password" data-ext="'+i+'.api_secret" placeholder="'+(r.secret_set?"•••••• (set — blank keeps it)":"")+'">')+
+				fldWrap("API Key / Login",'<input class="inp" data-ext="'+i+'.api_key" value="'+esc(r.api_key)+'">')+
+				fldWrap("API Secret / Password",'<input class="inp" type="password" data-ext="'+i+'.api_secret" placeholder="'+(r.secret_set?"•••••• (set — blank keeps it)":"")+'">')+
 				fldWrap("Merge Mode",'<select class="sel" data-ext="'+i+'.merge_mode">'+modes.map(o=>'<option '+(o===r.merge_mode?"selected":"")+'>'+o+'</option>').join("")+'</select>')+
-				fldWrap("Remote Warehouses (optional, one per line)",'<textarea class="inp" rows="2" data-ext="'+i+'.warehouses" placeholder="blank = all warehouses on the remote">'+esc(r.warehouses||"")+'</textarea>',true)+
+				fldWrap("Remote Warehouses (ERPNext only, one per line)",'<textarea class="inp" rows="2" data-ext="'+i+'.warehouses" placeholder="blank = all warehouses on the remote">'+esc(r.warehouses||"")+'</textarea>',true)+
 				'<div class="fld"><label>&nbsp;</label><label class="sw"><input type="checkbox" data-ext="'+i+'.verify_ssl" '+(r.verify_ssl?"checked":"")+'><span class="t"></span>Verify SSL</label></div>'+
 			'</div>'+
+			'<div class="mut" style="font-size:.74rem;margin-top:8px">Stylus → Base URL <b>https://externalapi.stylus.co.ao</b> · API Key = login · API Secret = password · Remote Warehouses ignored. Matches by ProductCode = Item Code.</div>'+
 			'<div class="ext-scope"><div class="ext-scope-h">Apply this source only to <span class="mut">(optional — leave blank for the whole catalogue)</span></div><div class="ext-grid">'+
 				fldWrap("Only Items",'<div class="ms" data-extms="'+i+'|scope_items|Item|item_code"><input placeholder="search items…"><div class="ms-drop"></div></div>')+
 				fldWrap("Only Brands",'<div class="ms" data-extms="'+i+'|scope_brands|Brand|name"><input placeholder="search brands…"><div class="ms-drop"></div></div>')+
@@ -652,6 +656,53 @@
 				'<td class="num diff">'+r.erp_qty+'</td></tr>').join("");
 			$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>SKU</th><th>Item Code</th><th>Item Name</th><th>Brand</th><th>Item Group</th><th class="num">ERP Qty</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" class="empty"><i class="fa-solid fa-circle-check"></i>Every ERP item with stock is already on the website.</td></tr>')+'</tbody></table></div>';
 		}catch(e){ $("pmBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
+	}
+
+	// ---------------- stylus ----------------
+	const SY_COLS={
+		catalogue:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stock","Stock","num"],["price","Price","money"],["is_active","Status","status"]],
+		vs_erp:[["code","Code"],["designation","Designation","mut"],["stylus_stock","Stylus Stock","num"],["erp_qty","ERP Qty","num"],["qty_diff","Δ Qty","signed"],["stylus_price","Stylus Price","money"],["erp_price","ERP Price","money"],["price_diff","Δ Price","signed"]],
+		not_in_erp:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stylus_stock","Stylus Stock","num"],["stylus_price","Stylus Price","money"]],
+		movement:[["code","Code"],["designation","Designation","mut"],["old_stock","Old","num"],["new_stock","New","num"],["delta","Δ Stock","signed"],["old_price","Old Price","money"],["new_price","New Price","money"]],
+	};
+	function renderStylus(c){
+		const sv=lsGet("cscart_sy_view","catalogue"); State.syView=sv;
+		const seg=(v,l)=>'<button class="seg-b'+(v===sv?" on":"")+'" data-v="'+v+'">'+l+'</button>';
+		c.innerHTML=
+			'<div class="toolbar">'+
+				'<div class="seg" id="syMode">'+seg("catalogue","Catalogue")+seg("vs_erp","vs ERP")+seg("not_in_erp","Not in ERP")+seg("movement","Movement")+'</div>'+
+				'<input class="inp" id="sySearch" style="max-width:200px" placeholder="Search code, item or brand…">'+
+				'<button class="btn" id="syReload"><i class="fa-solid fa-rotate"></i> Reload</button>'+
+				'<button class="btn" id="sySnap"><i class="fa-solid fa-camera"></i> Snapshot now</button>'+
+				'<span class="mut" id="syInfo" style="margin-left:auto;font-size:.8rem"></span>'+
+			'</div><div id="syBody"></div>';
+		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; lsSet("cscart_sy_view",State.syView); runStylus(); });
+		$("sySnap").onclick=async()=>{ try{ await api("snapshot_stylus_now",{},true); toast("Stylus snapshot queued — press Reload in a moment.","info"); setTimeout(runStylus,6000); }catch(e){ toast(e.message,"err"); } };
+		$("syReload").onclick=runStylus;
+		$("sySearch").addEventListener("keydown",e=>{ if(e.key==="Enter") runStylus(); });
+		runStylus();
+	}
+	async function runStylus(){
+		const view=State.syView||"catalogue";
+		$("syBody").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>';
+		try{
+			const m=await api("get_stylus",{ view, search:$("sySearch").value, limit:1000 });
+			$("syInfo").innerHTML = m.note? '<span class="amber">'+esc(m.note)+'</span>'
+				: (m.taken_on? (m.total+' rows · '+(view==="movement"?"changed since ":"snapshot ")+fmtDt(m.taken_on))
+				: '<span class="amber">No snapshot yet — press Snapshot now (needs an enabled Stylus source).</span>');
+			const cols=SY_COLS[view];
+			const cell=(col,r)=>{ const k=col[0],t=col[2]; const v=r[k];
+				if(t==="status") return '<td><span class="badge '+(v?"b-A":"b-D")+'">'+(v?"Active":"Inactive")+'</span></td>';
+				if(t==="money") return '<td class="num">'+pmMoney(v)+'</td>';
+				if(t==="signed") return '<td class="num '+(v?"diff":"")+'">'+pmSigned(v)+'</td>';
+				if(t==="num") return '<td class="num">'+(v==null?"—":v)+'</td>';
+				if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
+				return '<td>'+esc(v==null?"":v)+'</td>'; };
+			const head='<tr>'+cols.map(col=>'<th'+(["num","money","signed"].indexOf(col[2])>=0?' class="num"':'')+'>'+col[1]+'</th>').join("")+'</tr>';
+			const body=(m.rows||[]).map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
+				||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
+			$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+		}catch(e){ $("syBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
 	}
 
 	// ---------------- logs ----------------

@@ -113,6 +113,9 @@ scheduler_events = {
 			"isoft_cscart_integration.sync.scheduled_sync",
 		],
 	},
+	"hourly": [
+		"isoft_cscart_integration.stylus.snapshot_stylus",
+	],
 	"daily": [
 		"isoft_cscart_integration.sync.cleanup_logs",
 	],

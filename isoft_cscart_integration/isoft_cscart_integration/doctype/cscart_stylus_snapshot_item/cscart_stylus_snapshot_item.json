@@ -1,0 +1,28 @@
+{
+ "actions": [],
+ "creation": "2026-10-20 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["code","designation","brand","family","price","stock","is_active"],
+ "fields": [
+  {"fieldname": "code", "fieldtype": "Data", "in_list_view": 1, "label": "Code", "search_index": 1},
+  {"fieldname": "designation", "fieldtype": "Small Text", "in_list_view": 1, "label": "Designation"},
+  {"fieldname": "brand", "fieldtype": "Data", "in_list_view": 1, "label": "Brand"},
+  {"fieldname": "family", "fieldtype": "Data", "label": "Family"},
+  {"fieldname": "price", "fieldtype": "Float", "in_list_view": 1, "label": "Price", "precision": "2"},
+  {"fieldname": "stock", "fieldtype": "Float", "in_list_view": 1, "label": "Stock"},
+  {"default": "0", "fieldname": "is_active", "fieldtype": "Check", "label": "Active"}
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Isoft CSCart Integration",
+ "name": "CSCart Stylus Snapshot Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

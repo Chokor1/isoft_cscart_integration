@@ -1,0 +1,28 @@
+{
+ "actions": [],
+ "autoname": "format:STYS-{YYYY}-{#####}",
+ "creation": "2026-10-20 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["taken_on","item_count","items"],
+ "fields": [
+  {"fieldname": "taken_on", "fieldtype": "Datetime", "in_list_view": 1, "label": "Taken On", "read_only": 1},
+  {"fieldname": "item_count", "fieldtype": "Int", "in_list_view": 1, "label": "Item Count", "read_only": 1},
+  {"fieldname": "items", "fieldtype": "Table", "label": "Items", "options": "CSCart Stylus Snapshot Item"}
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Isoft CSCart Integration",
+ "name": "CSCart Stylus Snapshot",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
+  {"read": 1, "report": 1, "role": "CSCart Manager"}
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 0
+}
