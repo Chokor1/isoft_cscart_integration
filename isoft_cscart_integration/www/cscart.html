@@ -594,6 +594,21 @@
 	}
 	const pmMoney=(x)=>x==null?"—":Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
 	const pmSigned=(x)=>x==null?"—":(x>0?"+":"")+Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
+	// Column filter match. Numeric columns understand >, <, >=, <=, =, != and a..b ranges; else substring.
+	function colMatch(text, v, isNum){
+		const t=(text||"").trim(); if(!t) return true;
+		if(isNum){
+			const m=t.match(/^(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?)$/);
+			const rg=t.match(/^(-?\d+(?:\.\d+)?)\s*(?:\.\.|to)\s*(-?\d+(?:\.\d+)?)$/);
+			if(m||rg){
+				if(v==null||v==="") return false;
+				const n=Number(String(v).replace(/[^0-9.\-]/g,"")); if(isNaN(n)) return false;
+				if(m){ const q=Number(m[2]); return m[1]===">"?n>q:m[1]==="<"?n<q:m[1]===">="?n>=q:m[1]==="<="?n<=q:m[1]==="!="?n!==q:n===q; }
+				return n>=Number(rg[1]) && n<=Number(rg[2]);
+			}
+		}
+		return v!=null && String(v).toLowerCase().indexOf(t.toLowerCase())>=0;
+	}
 	function productColumns(){
 		const names=(State.pmData&&State.pmData.source_names)||[];
 		const cols=[
@@ -629,12 +644,12 @@
 			const cls=((c.num?"num ":"")+(c.cls||"")+((c.diff&&v)?" diff":"")+(c.strong?" strong":"")).trim();
 			return '<td'+(cls?' class="'+cls+'"':'')+'>'+disp+'</td>'; };
 		const view=()=>{ let rows=(m.rows||[]).slice();
-			Object.keys(State.pmFilters).forEach(k=>{ const t=(State.pmFilters[k]||"").trim().toLowerCase(); if(!t)return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>{ const v=c.g(r); return v!=null && String(v).toLowerCase().indexOf(t)>=0; }); });
+			Object.keys(State.pmFilters).forEach(k=>{ const t=State.pmFilters[k]; if(!t||!t.trim())return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>colMatch(t, c.g(r), !!c.num)); });
 			if(sort.k){ const col=byKey[sort.k]; if(col) rows.sort((a,b)=>{ let x=col.g(a),y=col.g(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; }); }
 			return rows; };
 		const buildBody=(rows)=>rows.map(r=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>').join("")
 			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>';
-		const filterRow='<tr class="filter-row">'+cols.map(c=>'<th'+(c.num?' class="num"':'')+'><input class="col-f" data-f="'+c.k+'" value="'+esc(State.pmFilters[c.k]||"")+'" placeholder="filter"></th>').join("")+'</tr>';
+		const filterRow='<tr class="filter-row">'+cols.map(c=>'<th'+(c.num?' class="num"':'')+'><input class="col-f" data-f="'+c.k+'" value="'+esc(State.pmFilters[c.k]||"")+'" placeholder="'+(c.num?'&gt;0  &lt;5  1..9':'filter')+'"></th>').join("")+'</tr>';
 		const headRow='<tr>'+cols.map(c=>{ const a=sort.k===c.k; return '<th class="'+(c.num?"num ":"")+'sortable'+(a?" sorted":"")+'" data-sort="'+c.k+'">'+esc(c.l)+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
 		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
 		$("pmBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; if(State.pmSort.k===k)State.pmSort.dir*=-1; else State.pmSort={k,dir:1}; renderProductTable(); });
@@ -715,12 +730,12 @@
 			if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
 			return '<td>'+esc(v==null?"":v)+'</td>'; };
 		const view=()=>{ let rows=(State.syRows||[]).slice();
-			Object.keys(State.syFilters).forEach(k=>{ const t=(State.syFilters[k]||"").trim().toLowerCase(); if(!t)return; rows=rows.filter(r=>{ const v=r[k]; return v!=null && String(v).toLowerCase().indexOf(t)>=0; }); });
+			Object.keys(State.syFilters).forEach(k=>{ const t=State.syFilters[k]; if(!t||!t.trim())return; const col=cols.find(cc=>cc[0]===k); const isNum=col?["num","money","signed"].indexOf(col[2])>=0:false; rows=rows.filter(r=>colMatch(t, r[k], isNum)); });
 			if(sort.k) rows.sort((a,b)=>{ let x=a[sort.k],y=b[sort.k]; if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; });
 			return rows; };
 		const buildBody=(rows)=>rows.map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
 			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
-		const filterRow='<tr class="filter-row">'+cols.map(col=>'<th'+(["num","money","signed"].indexOf(col[2])>=0?' class="num"':'')+'><input class="col-f" data-f="'+col[0]+'" value="'+esc(State.syFilters[col[0]]||"")+'" placeholder="filter"></th>').join("")+'</tr>';
+		const filterRow='<tr class="filter-row">'+cols.map(col=>{ const n=["num","money","signed"].indexOf(col[2])>=0; return '<th'+(n?' class="num"':'')+'><input class="col-f" data-f="'+col[0]+'" value="'+esc(State.syFilters[col[0]]||"")+'" placeholder="'+(n?'&gt;0  &lt;5  1..9':'filter')+'"></th>'; }).join("")+'</tr>';
 		const headRow='<tr>'+cols.map(col=>{ const a=sort.k===col[0]; return '<th class="sortable'+(["num","money","signed"].indexOf(col[2])>=0?" num":"")+(a?" sorted":"")+'" data-k="'+col[0]+'">'+col[1]+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
 		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
 		$("syBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(State.sySort.k===k)State.sySort.dir*=-1; else State.sySort={k,dir:1}; renderStylusTable(); });
