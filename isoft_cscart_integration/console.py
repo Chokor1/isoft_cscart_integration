@@ -170,6 +170,7 @@ def test_external_source(payload):
 				break
 
 	cfg = {
+		"source_type": row.get("source_type") or "ERPNext",
 		"base_url": (row.get("base_url") or "").strip().rstrip("/"),
 		"api_key": (row.get("api_key") or "").strip(),
 		"api_secret": secret,
