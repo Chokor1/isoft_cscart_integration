@@ -8,7 +8,7 @@ Everything is System Manager only; sync jobs are enqueued, never run inline
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt
+from frappe.utils import add_days, cint, flt, now_datetime
 
 from isoft_cscart_integration import api, erp, external, sync
 
@@ -271,6 +271,28 @@ def snapshot_stylus_now():
 
 
 @frappe.whitelist()
+def get_stylus_price_log(search=None, days=30, limit=3000):
+	"""Persistent log of Stylus price changes (one row per code per snapshot where
+	the price moved). `days` limits how far back to read; 0 = all history."""
+	_guard()
+	search = (search or "").strip()
+	days = cint(days)
+	limit = cint(limit) or 3000
+	filters = {}
+	if days:
+		filters["changed_on"] = [">=", add_days(now_datetime(), -days)]
+	if search:
+		filters["code"] = ["like", "%" + search + "%"]
+	rows = frappe.get_all("CSCart Stylus Price Log", filters=filters,
+		fields=["code", "designation", "brand", "changed_on", "old_price", "new_price", "delta", "pct"],
+		order_by="changed_on desc", limit_page_length=limit)
+	for r in rows:
+		r["changed_on"] = str(r["changed_on"])
+	total = frappe.db.count("CSCart Stylus Price Log", filters=filters)
+	return {"rows": rows, "total": total}
+
+
+@frappe.whitelist()
 def get_warehouses():
 	"""All active warehouses, for the stock-source picker table."""
 	_guard()
@@ -285,17 +307,19 @@ def get_warehouses():
 
 
 @frappe.whitelist()
-def get_products(mode="all", search=None, limit=800, hide_disabled=0):
+def get_products(mode="all", search=None, limit=800, hide_disabled=0, hide_zero=0):
 	"""Website products from the map with their ERP match + stock comparison.
 
 	mode: all | matched | unmatched | changes
 	hide_disabled: drop products disabled on the site (status D).
+	hide_zero: drop rows whose ERP qty is 0 or has no ERP match.
 	"""
 	_guard()
 	s = frappe.get_single(SETTINGS_DT)
 	search = (search or "").strip().upper()
 	limit = cint(limit) or 800
 	hide_disabled = cint(hide_disabled)
+	hide_zero = cint(hide_zero)
 
 	items = erp.eligible_items(s)
 	norm_to_item = {m["sku_normalized"]: c for c, m in items.items() if m["sku_normalized"]}
@@ -350,6 +374,8 @@ def get_products(mode="all", search=None, limit=800, hide_disabled=0):
 
 	def keep(row):
 		if hide_disabled and row["site_status"] == "D":
+			return False
+		if hide_zero and not row["total_qty"]:
 			return False
 		if mode == "matched" and not row["matched"]:
 			return False

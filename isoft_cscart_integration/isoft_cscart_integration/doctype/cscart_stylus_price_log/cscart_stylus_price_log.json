@@ -1,0 +1,33 @@
+{
+ "actions": [],
+ "autoname": "format:STYPL-{YYYY}-{######}",
+ "creation": "2026-10-21 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["code","designation","brand","changed_on","old_price","new_price","delta","pct"],
+ "fields": [
+  {"fieldname": "code", "fieldtype": "Data", "in_list_view": 1, "in_standard_filter": 1, "label": "Product Code", "read_only": 1, "search_index": 1},
+  {"fieldname": "designation", "fieldtype": "Data", "in_list_view": 1, "label": "Designation", "read_only": 1},
+  {"fieldname": "brand", "fieldtype": "Data", "in_list_view": 1, "in_standard_filter": 1, "label": "Brand", "read_only": 1},
+  {"fieldname": "changed_on", "fieldtype": "Datetime", "in_list_view": 1, "in_standard_filter": 1, "label": "Changed On", "read_only": 1, "search_index": 1},
+  {"fieldname": "old_price", "fieldtype": "Float", "in_list_view": 1, "label": "Old Price", "precision": "2", "read_only": 1},
+  {"fieldname": "new_price", "fieldtype": "Float", "in_list_view": 1, "label": "New Price", "precision": "2", "read_only": 1},
+  {"fieldname": "delta", "fieldtype": "Float", "in_list_view": 1, "label": "Delta", "precision": "2", "read_only": 1},
+  {"fieldname": "pct", "fieldtype": "Float", "in_list_view": 1, "label": "Change %", "precision": "1", "read_only": 1}
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Isoft CSCart Integration",
+ "name": "CSCart Stylus Price Log",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
+  {"read": 1, "report": 1, "role": "CSCart Manager"}
+ ],
+ "sort_field": "changed_on",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

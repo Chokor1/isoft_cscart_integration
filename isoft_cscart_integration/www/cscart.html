@@ -575,20 +575,25 @@
 	function renderProducts(c){
 		const savedMode=lsGet("cscart_pm_mode","all");
 		const savedHide=lsGet("cscart_pm_hide_disabled","0")==="1";
-		State.pmMode=savedMode; State.pmHideDisabled=savedHide;
+		const savedZero=lsGet("cscart_pm_hide_zero","0")==="1";
+		State.pmMode=savedMode; State.pmHideDisabled=savedHide; State.pmHideZero=savedZero;
 		const seg=(m,l)=>'<button class="seg-b'+(m===savedMode?" on":"")+'" data-m="'+m+'">'+l+'</button>';
 		c.innerHTML=
 			'<div class="toolbar">'+
 				'<div class="seg" id="pmMode">'+seg("all","All")+seg("matched","Matched")+seg("unmatched","Unmatched")+seg("changes","Stock Δ")+seg("missing","Missing on Site")+'</div>'+
 				'<label class="check"><input type="checkbox" id="pmHide" '+(savedHide?"checked":"")+'> Hide disabled</label>'+
+				'<label class="check"><input type="checkbox" id="pmHideZero" '+(savedZero?"checked":"")+'> Hide 0 ERP qty</label>'+
 				'<input class="inp" id="pmSearch" style="max-width:200px" placeholder="Search SKU or Item…">'+
 				'<button class="btn" id="pmFetch"><i class="fa-solid fa-cloud-arrow-down"></i> Fetch from website</button>'+
 				'<button class="btn" id="pmReload"><i class="fa-solid fa-rotate"></i> Reload</button>'+
+				'<button class="btn" id="pmExport"><i class="fa-solid fa-file-csv"></i> Export</button>'+
 				'<span class="mut" id="pmCounts" style="margin-left:auto;font-size:.8rem"></span>'+
 			'</div><div id="pmBody"></div>';
 		$("pmFetch").onclick=async()=>{ try{ await api("refresh_map",{},true); toast("Fetching the catalogue from the website… this runs in the background, press Reload in a moment.","info"); setTimeout(runProducts,6000); }catch(e){ toast(e.message,"err"); } };
 		c.querySelectorAll("#pmMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#pmMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.pmMode=b.dataset.m; lsSet("cscart_pm_mode",State.pmMode); runProducts(); });
 		$("pmHide").onchange=(e)=>{ State.pmHideDisabled=e.target.checked; lsSet("cscart_pm_hide_disabled", e.target.checked?"1":"0"); runProducts(); };
+		$("pmHideZero").onchange=(e)=>{ State.pmHideZero=e.target.checked; lsSet("cscart_pm_hide_zero", e.target.checked?"1":"0"); runProducts(); };
+		$("pmExport").onclick=exportProducts;
 		$("pmReload").onclick=runProducts;
 		$("pmSearch").addEventListener("keydown",e=>{ if(e.key==="Enter") runProducts(); });
 		runProducts();
@@ -598,6 +603,15 @@
 	const pmPct=(x)=>x==null?"—":(x>0?"+":"")+Number(x).toLocaleString(undefined,{maximumFractionDigits:1})+"%";
 	// Δ cell colour. Default: positive=green (more), negative=red (less). invert (price): less=green, more=red.
 	const dcls=(v,invert)=>{ if(!v) return ""; const good = invert ? v<0 : v>0; return good?"d-up":"d-dn"; };
+	// CSV export (BOM so Excel reads UTF-8).
+	const csvEsc=(v)=>{ v=(v==null?"":String(v)); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+	function downloadCSV(name, headers, matrix){
+		if(!matrix||!matrix.length){ toast("Nothing to export.","err"); return; }
+		const txt=[headers.map(csvEsc).join(",")].concat(matrix.map(r=>r.map(csvEsc).join(","))).join("\r\n");
+		const b=new Blob(["﻿"+txt],{type:"text/csv;charset=utf-8;"}); const u=URL.createObjectURL(b);
+		const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+		setTimeout(()=>URL.revokeObjectURL(u),2000);
+	}
 	// Column filter match. Numeric columns understand >, <, >=, <=, =, != and a..b ranges; else substring.
 	function colMatch(text, v, isNum){
 		const t=(text||"").trim(); if(!t) return true;
@@ -637,6 +651,13 @@
 		cols.push({k:"price_diff_pct",l:"Δ Price %",g:r=>r.price_diff_pct,num:1,diff:1,pct:1,invert:1});
 		return cols;
 	}
+	function exportProducts(){
+		const e=State.pmExport;
+		if(!e||!e.rows){ toast("Nothing to export.","err"); return; }
+		const headers=e.cols.map(c=>c.l);
+		const matrix=e.rows.map(r=>e.cols.map(c=>{ let v; if(c.tag){ v=r.matched?r.item_code:"unmatched"; } else if(c.badge){ v=r.site_status; } else { v=c.g(r); } return v==null?"":v; }));
+		downloadCSV("cscart-products-"+(State.pmMode||"all")+".csv", headers, matrix);
+	}
 	function renderProductTable(){
 		const m=State.pmData; if(!m) return;
 		const cols=productColumns();
@@ -654,8 +675,8 @@
 			Object.keys(State.pmFilters).forEach(k=>{ const t=State.pmFilters[k]; if(!t||!t.trim())return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>colMatch(t, c.g(r), !!c.num)); });
 			if(sort.k){ const col=byKey[sort.k]; if(col) rows.sort((a,b)=>{ let x=col.g(a),y=col.g(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; }); }
 			return rows; };
-		const buildBody=(rows)=>rows.map(r=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>').join("")
-			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>';
+		const buildBody=(rows)=>{ State.pmExport={cols, rows}; return rows.map(r=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>').join("")
+			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>'; };
 		const filterRow='<tr class="filter-row">'+cols.map(c=>'<th'+(c.num?' class="num"':'')+'><input class="col-f" data-f="'+c.k+'" value="'+esc(State.pmFilters[c.k]||"")+'" placeholder="'+(c.num?'&gt;0  &lt;5  1..9':'filter')+'"></th>').join("")+'</tr>';
 		const headRow='<tr>'+cols.map(c=>{ const a=sort.k===c.k; return '<th class="'+(c.num?"num ":"")+'sortable'+(a?" sorted":"")+'" data-sort="'+c.k+'">'+esc(c.l)+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
 		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
@@ -666,7 +687,7 @@
 		if((State.pmMode||"all")==="missing") return runMissing();
 		$("pmBody").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>';
 		try{
-			const m=await api("get_products",{ mode:State.pmMode||"all", search:$("pmSearch").value, limit:800, hide_disabled: State.pmHideDisabled?1:0 });
+			const m=await api("get_products",{ mode:State.pmMode||"all", search:$("pmSearch").value, limit:800, hide_disabled: State.pmHideDisabled?1:0, hide_zero: State.pmHideZero?1:0 });
 			State.pmData=m;
 			const c=m.counts;
 			$("pmCounts").innerHTML=c.total+' products · <b class="ok-t">'+c.matched+'</b> matched · <b class="amber">'+c.unmatched+'</b> unmatched'+((m.source_names&&m.source_names.length)?' · <span class="mut">+'+m.source_names.length+' external source(s)</span>':(c.has_warehouses?"":' · <span class="amber">no stock source — ERP qty hidden</span>'));
@@ -678,6 +699,7 @@
 		try{
 			const m=await api("get_erp_only",{ only_stock:1, search:$("pmSearch").value, limit:800 });
 			$("pmCounts").innerHTML='<b class="amber">'+m.total+'</b> ERP items with stock but not on the website';
+			State.pmExport={ cols:[{l:"SKU",g:r=>r.sku},{l:"Item Code",g:r=>r.item_code},{l:"Item Name",g:r=>r.item_name},{l:"Brand",g:r=>r.brand},{l:"Item Group",g:r=>r.item_group},{l:"ERP Qty",g:r=>r.erp_qty}], rows:m.rows };
 			const rows=m.rows.map(r=>'<tr>'+
 				'<td>'+esc(r.sku)+'</td>'+
 				'<td>'+esc(r.item_code)+'</td>'+
@@ -695,45 +717,70 @@
 		vs_erp:[["code","Code"],["designation","Designation","mut"],["stylus_stock","Stylus Stock","num"],["erp_qty","ERP Qty","num"],["qty_diff","Δ Qty","signed"],["qty_diff_pct","Δ Qty %","pct"],["stylus_price","Stylus Price","money"],["erp_price","ERP Price","money"],["price_diff","Δ Price","signed"],["price_diff_pct","Δ Price %","pct"]],
 		not_in_erp:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stylus_stock","Stylus Stock","num"],["stylus_price","Stylus Price","money"]],
 		movement:[["code","Code"],["designation","Designation","mut"],["old_stock","Old","num"],["new_stock","New","num"],["delta","Δ Stock","signed"],["old_price","Old Price","money"],["new_price","New Price","money"]],
+		price_log:[["changed_on","Changed On","dt"],["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["old_price","Old Price","money"],["new_price","New Price","money"],["delta","Δ Price","signed"],["pct","Change %","pct"]],
 	};
 	function renderStylus(c){
 		const sv=lsGet("cscart_sy_view","catalogue"); State.syView=sv;
 		const seg=(v,l)=>'<button class="seg-b'+(v===sv?" on":"")+'" data-v="'+v+'">'+l+'</button>';
 		c.innerHTML=
 			'<div class="toolbar">'+
-				'<div class="seg" id="syMode">'+seg("catalogue","Catalogue")+seg("vs_erp","vs ERP")+seg("not_in_erp","Not in ERP")+seg("movement","Movement")+'</div>'+
+				'<div class="seg" id="syMode">'+seg("catalogue","Catalogue")+seg("vs_erp","vs ERP")+seg("not_in_erp","Not in ERP")+seg("movement","Movement")+seg("price_log","Price Log")+'</div>'+
+				'<span id="syDaysWrap" style="display:none;font-size:.82rem;color:var(--ink-2)">Last <select class="sel" id="syDays" style="width:auto;display:inline-block;padding:.3rem .5rem;margin-left:4px"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">1 year</option><option value="0">All</option></select></span>'+
 				'<input class="inp" id="sySearch" style="max-width:200px" placeholder="Search code, item or brand…">'+
 				'<button class="btn" id="syReload"><i class="fa-solid fa-rotate"></i> Reload</button>'+
 				'<button class="btn" id="sySnap"><i class="fa-solid fa-camera"></i> Snapshot now</button>'+
+				'<button class="btn" id="syExport"><i class="fa-solid fa-file-csv"></i> Export</button>'+
 				'<span class="mut" id="syInfo" style="margin-left:auto;font-size:.8rem"></span>'+
 			'</div><div id="syBody"></div>';
 		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; lsSet("cscart_sy_view",State.syView); runStylus(); });
 		$("sySnap").onclick=async()=>{ try{ await api("snapshot_stylus_now",{},true); toast("Stylus snapshot queued — press Reload in a moment.","info"); setTimeout(runStylus,6000); }catch(e){ toast(e.message,"err"); } };
+		$("syExport").onclick=exportStylus;
+		$("syDays").onchange=runStylus;
 		$("syReload").onclick=runStylus;
 		$("sySearch").addEventListener("keydown",e=>{ if(e.key==="Enter") runStylus(); });
 		runStylus();
 	}
 	async function runStylus(){
 		const view=State.syView||"catalogue";
+		const dw=$("syDaysWrap"); if(dw) dw.style.display = view==="price_log"?"":"none";
 		$("syBody").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>';
 		try{
-			const m=await api("get_stylus",{ view, search:$("sySearch").value, limit:1000 });
-			State.syRows=m.rows||[];
-			$("syInfo").innerHTML = m.note? '<span class="amber">'+esc(m.note)+'</span>'
-				: (m.taken_on? (m.total+' rows · '+(view==="movement"?"changed since ":"snapshot ")+fmtDt(m.taken_on))
-				: '<span class="amber">No snapshot yet — press Snapshot now (needs an enabled Stylus source).</span>');
+			let m;
+			if(view==="price_log"){
+				m=await api("get_stylus_price_log",{ search:$("sySearch").value, days:($("syDays")?$("syDays").value:30), limit:3000 });
+				State.syRows=m.rows||[];
+				$("syInfo").innerHTML = m.total
+					? ('<b>'+m.total+'</b> price change(s)'+(m.rows.length<m.total?' · showing latest '+m.rows.length:''))
+					: '<span class="amber">No Stylus price changes logged yet — they are recorded as snapshots detect new prices.</span>';
+			}else{
+				m=await api("get_stylus",{ view, search:$("sySearch").value, limit:1000 });
+				State.syRows=m.rows||[];
+				$("syInfo").innerHTML = m.note? '<span class="amber">'+esc(m.note)+'</span>'
+					: (m.taken_on? (m.total+' rows · '+(view==="movement"?"changed since ":"snapshot ")+fmtDt(m.taken_on))
+					: '<span class="amber">No snapshot yet — press Snapshot now (needs an enabled Stylus source).</span>');
+			}
 			renderStylusTable();
 		}catch(e){ $("syBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
+	}
+	function exportStylus(){
+		const cols=SY_COLS[State.syView||"catalogue"];
+		const rows=State.syExport&&State.syExport.rows;
+		if(!rows){ toast("Nothing to export.","err"); return; }
+		const headers=cols.map(c=>c[1]);
+		const matrix=rows.map(r=>cols.map(c=>{ const v=r[c[0]]; return v==null?"":v; }));
+		downloadCSV("cscart-stylus-"+(State.syView||"catalogue")+".csv", headers, matrix);
 	}
 	function renderStylusTable(){
 		const cols=SY_COLS[State.syView||"catalogue"];
 		const sort=State.sySort||(State.sySort={k:null,dir:1});
 		State.syFilters=State.syFilters||{};
+		const priceView=(State.syView==="price_log");
 		const cell=(col,r)=>{ const t=col[2]; const v=r[col[0]];
 			if(t==="status") return '<td><span class="badge '+(v?"b-A":"b-D")+'">'+(v?"Active":"Inactive")+'</span></td>';
+			if(t==="dt") return '<td>'+esc(fmtDt(v))+'</td>';
 			if(t==="money") return '<td class="num">'+pmMoney(v)+'</td>';
-			if(t==="signed") return '<td class="num '+dcls(v,col[0].indexOf("price")>=0)+'">'+pmSigned(v)+'</td>';
-			if(t==="pct") return '<td class="num '+dcls(v,col[0].indexOf("price")>=0)+'">'+pmPct(v)+'</td>';
+			if(t==="signed") return '<td class="num '+dcls(v,col[0].indexOf("price")>=0||priceView)+'">'+pmSigned(v)+'</td>';
+			if(t==="pct") return '<td class="num '+dcls(v,col[0].indexOf("price")>=0||priceView)+'">'+pmPct(v)+'</td>';
 			if(t==="num") return '<td class="num">'+(v==null?"—":v)+'</td>';
 			if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
 			return '<td>'+esc(v==null?"":v)+'</td>'; };
@@ -741,8 +788,8 @@
 			Object.keys(State.syFilters).forEach(k=>{ const t=State.syFilters[k]; if(!t||!t.trim())return; const col=cols.find(cc=>cc[0]===k); const isNum=col?["num","money","signed","pct"].indexOf(col[2])>=0:false; rows=rows.filter(r=>colMatch(t, r[k], isNum)); });
 			if(sort.k) rows.sort((a,b)=>{ let x=a[sort.k],y=b[sort.k]; if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; });
 			return rows; };
-		const buildBody=(rows)=>rows.map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
-			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
+		const buildBody=(rows)=>{ State.syExport={rows}; return rows.map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
+			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>'; };
 		const filterRow='<tr class="filter-row">'+cols.map(col=>{ const n=["num","money","signed","pct"].indexOf(col[2])>=0; return '<th'+(n?' class="num"':'')+'><input class="col-f" data-f="'+col[0]+'" value="'+esc(State.syFilters[col[0]]||"")+'" placeholder="'+(n?'&gt;0  &lt;5  1..9':'filter')+'"></th>'; }).join("")+'</tr>';
 		const headRow='<tr>'+cols.map(col=>{ const a=sort.k===col[0]; return '<th class="sortable'+(["num","money","signed","pct"].indexOf(col[2])>=0?" num":"")+(a?" sorted":"")+'" data-k="'+col[0]+'">'+col[1]+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
 		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+buildBody(view())+'</tbody></table></div>';
