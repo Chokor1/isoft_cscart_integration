@@ -243,12 +243,17 @@ def get_stylus(view="catalogue", search=None, limit=1000):
 				continue
 			erp_qty = int(flt(local.get(it.code, 0))) if matched else None
 			erp_price = prices.get(it.code) if matched else None
+			# Δ = ERP − Stylus: positive when ERP holds more than Stylus.
+			qty_diff = (erp_qty - it.stock) if erp_qty is not None else None
+			qty_diff_pct = round(qty_diff / it.stock * 100, 1) if (qty_diff is not None and it.stock) else None
+			price_diff_pct = round((erp_price - it.price) / it.price * 100, 1) if (erp_price and it.price) else None
 			rows.append({
 				"code": it.code, "designation": it.designation, "brand": it.brand,
 				"stylus_stock": it.stock, "erp_qty": erp_qty,
-				"qty_diff": (it.stock - erp_qty) if erp_qty is not None else None,
+				"qty_diff": qty_diff, "qty_diff_pct": qty_diff_pct,
 				"stylus_price": it.price, "erp_price": erp_price,
-				"price_diff": round(it.price - erp_price, 2) if erp_price else None,
+				"price_diff": round(erp_price - it.price, 2) if erp_price else None,
+				"price_diff_pct": price_diff_pct,
 			})
 		rows = _sy_search(rows, search, ("code", "designation", "brand"))
 		return {"rows": rows[:limit], "taken_on": str(snap["taken_on"]), "total": len(rows)}
@@ -318,25 +323,28 @@ def get_products(mode="all", search=None, limit=800, hide_disabled=0):
 		matched = bool(item_code and item_code in items)
 		if matched:
 			matched_n += 1
+		site_amount = cint(r.cscart_amount)
 		if matched and has_qty:
 			local_qty = int(flt(local_raw.get(item_code, 0)))
 			sources_row = [{"name": d["name"], "qty": int(flt(d["qtys"].get(item_code, 0)))} for d in src_data]
 			total_qty = cint(total.get(item_code, 0))
-			# Δ = Site − ERP: negative when the site is short of ERP stock.
-			qty_diff = cint(r.cscart_amount) - total_qty
+			# Δ = ERP − Site: positive when ERP holds more than the site.
+			qty_diff = total_qty - site_amount
+			qty_diff_pct = round(qty_diff / site_amount * 100, 1) if site_amount else None
 		else:
-			local_qty, sources_row, total_qty, qty_diff = None, [], None, None
+			local_qty, sources_row, total_qty, qty_diff, qty_diff_pct = None, [], None, None, None
 		erp_rate = prices.get(item_code) if matched else None
 		erp_price = sync.compute_site_price(s, erp_rate) if erp_rate else None
 		site_price = flt(r.cscart_price)
-		# Δ = Site − ERP, same convention as qty.
-		price_diff = round(site_price - erp_price, 2) if erp_price is not None else None
+		# Δ = ERP − Site, same convention as qty.
+		price_diff = round(erp_price - site_price, 2) if erp_price is not None else None
+		price_diff_pct = round((erp_price - site_price) / site_price * 100, 1) if (erp_price is not None and site_price) else None
 		all_rows.append({
 			"product_id": r.product_id, "sku": r.sku, "item_code": item_code if matched else None,
 			"product_name": r.product_name, "site_status": r.cscart_status,
 			"local_qty": local_qty, "sources": sources_row, "total_qty": total_qty, "erp_qty": total_qty,
-			"site_qty": cint(r.cscart_amount), "qty_diff": qty_diff,
-			"erp_price": erp_price, "site_price": site_price, "price_diff": price_diff,
+			"site_qty": site_amount, "qty_diff": qty_diff, "qty_diff_pct": qty_diff_pct,
+			"erp_price": erp_price, "site_price": site_price, "price_diff": price_diff, "price_diff_pct": price_diff_pct,
 			"matched": matched,
 		})
 
