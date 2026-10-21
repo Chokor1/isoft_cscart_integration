@@ -596,6 +596,8 @@
 	const pmMoney=(x)=>x==null?"—":Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
 	const pmSigned=(x)=>x==null?"—":(x>0?"+":"")+Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
 	const pmPct=(x)=>x==null?"—":(x>0?"+":"")+Number(x).toLocaleString(undefined,{maximumFractionDigits:1})+"%";
+	// Δ cell colour. Default: positive=green (more), negative=red (less). invert (price): less=green, more=red.
+	const dcls=(v,invert)=>{ if(!v) return ""; const good = invert ? v<0 : v>0; return good?"d-up":"d-dn"; };
 	// Column filter match. Numeric columns understand >, <, >=, <=, =, != and a..b ranges; else substring.
 	function colMatch(text, v, isNum){
 		const t=(text||"").trim(); if(!t) return true;
@@ -631,8 +633,8 @@
 		cols.push({k:"qty_diff_pct",l:"Δ Qty %",g:r=>r.qty_diff_pct,num:1,diff:1,pct:1});
 		cols.push({k:"erp_price",l:"ERP Price",g:r=>r.erp_price,num:1,money:1});
 		cols.push({k:"site_price",l:"Site Price",g:r=>r.site_price,num:1,money:1});
-		cols.push({k:"price_diff",l:"Δ Price",g:r=>r.price_diff,num:1,money:1,diff:1,signed:1});
-		cols.push({k:"price_diff_pct",l:"Δ Price %",g:r=>r.price_diff_pct,num:1,diff:1,pct:1});
+		cols.push({k:"price_diff",l:"Δ Price",g:r=>r.price_diff,num:1,money:1,diff:1,signed:1,invert:1});
+		cols.push({k:"price_diff_pct",l:"Δ Price %",g:r=>r.price_diff_pct,num:1,diff:1,pct:1,invert:1});
 		return cols;
 	}
 	function renderProductTable(){
@@ -645,7 +647,8 @@
 			if(c.badge) return '<td><span class="badge b-'+esc(r.site_status)+'">'+esc(r.site_status||"?")+'</span></td>';
 			if(c.tag) return '<td>'+(r.matched?'<span class="tag-ok">'+esc(r.item_code)+'</span>':'<span class="tag-no">unmatched</span>')+'</td>';
 			let disp = c.money?pmMoney(v) : c.pct?pmPct(v) : c.signed?pmSigned(v) : (v==null?"—":esc(c.cut?String(v).slice(0,c.cut):v));
-			const cls=((c.num?"num ":"")+(c.cls||"")+(c.diff?(v>0?" d-up":v<0?" d-dn":""):"")+(c.strong?" strong":"")).trim();
+			const dc=c.diff?dcls(v,c.invert):"";
+			const cls=((c.num?"num ":"")+(c.cls||"")+(dc?" "+dc:"")+(c.strong?" strong":"")).trim();
 			return '<td'+(cls?' class="'+cls+'"':'')+'>'+disp+'</td>'; };
 		const view=()=>{ let rows=(m.rows||[]).slice();
 			Object.keys(State.pmFilters).forEach(k=>{ const t=State.pmFilters[k]; if(!t||!t.trim())return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>colMatch(t, c.g(r), !!c.num)); });
@@ -729,8 +732,8 @@
 		const cell=(col,r)=>{ const t=col[2]; const v=r[col[0]];
 			if(t==="status") return '<td><span class="badge '+(v?"b-A":"b-D")+'">'+(v?"Active":"Inactive")+'</span></td>';
 			if(t==="money") return '<td class="num">'+pmMoney(v)+'</td>';
-			if(t==="signed") return '<td class="num '+(v>0?"d-up":v<0?"d-dn":"")+'">'+pmSigned(v)+'</td>';
-			if(t==="pct") return '<td class="num '+(v>0?"d-up":v<0?"d-dn":"")+'">'+pmPct(v)+'</td>';
+			if(t==="signed") return '<td class="num '+dcls(v,col[0].indexOf("price")>=0)+'">'+pmSigned(v)+'</td>';
+			if(t==="pct") return '<td class="num '+dcls(v,col[0].indexOf("price")>=0)+'">'+pmPct(v)+'</td>';
 			if(t==="num") return '<td class="num">'+(v==null?"—":v)+'</td>';
 			if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
 			return '<td>'+esc(v==null?"":v)+'</td>'; };
