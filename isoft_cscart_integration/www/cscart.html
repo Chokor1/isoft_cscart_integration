@@ -162,6 +162,7 @@
 	input.col-f::placeholder{color:var(--muted);font-weight:400;}
 	input.col-f:focus{outline:none;border-color:var(--accent);}
 	.mut{color:var(--muted);} .diff{color:var(--accent);font-weight:700;} .amber{color:var(--amber);font-weight:600;}
+	.tbl td.d-up{color:var(--ok);font-weight:700;} .tbl td.d-dn{color:var(--red);font-weight:700;}
 	.row-un{background:#fffbeb;}
 	.badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;background:#eef2f7;color:#475569;}
 	.b-A,.b-Approved,.b-Success{background:var(--ok-soft);color:#15803d;}
@@ -644,7 +645,7 @@
 			if(c.badge) return '<td><span class="badge b-'+esc(r.site_status)+'">'+esc(r.site_status||"?")+'</span></td>';
 			if(c.tag) return '<td>'+(r.matched?'<span class="tag-ok">'+esc(r.item_code)+'</span>':'<span class="tag-no">unmatched</span>')+'</td>';
 			let disp = c.money?pmMoney(v) : c.pct?pmPct(v) : c.signed?pmSigned(v) : (v==null?"—":esc(c.cut?String(v).slice(0,c.cut):v));
-			const cls=((c.num?"num ":"")+(c.cls||"")+((c.diff&&v)?" diff":"")+(c.strong?" strong":"")).trim();
+			const cls=((c.num?"num ":"")+(c.cls||"")+(c.diff?(v>0?" d-up":v<0?" d-dn":""):"")+(c.strong?" strong":"")).trim();
 			return '<td'+(cls?' class="'+cls+'"':'')+'>'+disp+'</td>'; };
 		const view=()=>{ let rows=(m.rows||[]).slice();
 			Object.keys(State.pmFilters).forEach(k=>{ const t=State.pmFilters[k]; if(!t||!t.trim())return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>colMatch(t, c.g(r), !!c.num)); });
@@ -728,8 +729,8 @@
 		const cell=(col,r)=>{ const t=col[2]; const v=r[col[0]];
 			if(t==="status") return '<td><span class="badge '+(v?"b-A":"b-D")+'">'+(v?"Active":"Inactive")+'</span></td>';
 			if(t==="money") return '<td class="num">'+pmMoney(v)+'</td>';
-			if(t==="signed") return '<td class="num '+(v?"diff":"")+'">'+pmSigned(v)+'</td>';
-			if(t==="pct") return '<td class="num '+(v?"diff":"")+'">'+pmPct(v)+'</td>';
+			if(t==="signed") return '<td class="num '+(v>0?"d-up":v<0?"d-dn":"")+'">'+pmSigned(v)+'</td>';
+			if(t==="pct") return '<td class="num '+(v>0?"d-up":v<0?"d-dn":"")+'">'+pmPct(v)+'</td>';
 			if(t==="num") return '<td class="num">'+(v==null?"—":v)+'</td>';
 			if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
 			return '<td>'+esc(v==null?"":v)+'</td>'; };
