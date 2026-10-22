@@ -606,16 +606,26 @@
 	const pmPct=(x)=>x==null?"—":(x>0?"+":"")+Number(x).toLocaleString(undefined,{maximumFractionDigits:1})+"%";
 	// Δ cell colour. Default: positive=green (more), negative=red (less). invert (price): less=green, more=red.
 	const dcls=(v,invert)=>{ if(!v) return ""; const good = invert ? v<0 : v>0; return good?"d-up":"d-dn"; };
-	// CSV export. Semicolon-separated + a "sep=;" hint and a UTF-8 BOM so Excel
-	// (incl. locales whose list separator is ";") splits it into columns.
-	const CSV_SEP=";";
-	const csvEsc=(v)=>{ v=(v==null?"":String(v)); return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-	function downloadCSV(name, headers, matrix){
-		if(!matrix||!matrix.length){ toast("Nothing to export.","err"); return; }
-		const body=[headers.map(csvEsc).join(CSV_SEP)].concat(matrix.map(r=>r.map(csvEsc).join(CSV_SEP))).join("\r\n");
-		const txt="sep="+CSV_SEP+"\r\n"+body;
-		const b=new Blob(["﻿"+txt],{type:"text/csv;charset=utf-8;"}); const u=URL.createObjectURL(b);
-		const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+	// Excel export: a styled HTML workbook (.xls) so Excel opens a real table —
+	// bold shaded header, bordered cells, numbers right-aligned, text left.
+	const xlsEsc=(v)=>String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+	// columns: [{label, num(bool), get(row)}]
+	function downloadExcel(name, columns, rows){
+		if(!rows||!rows.length){ toast("Nothing to export.","err"); return; }
+		const HB="background:#1e293b;color:#ffffff;font-weight:700;border:1px solid #334155;padding:6px 10px;white-space:nowrap;";
+		const CB="border:1px solid #cbd5e1;padding:4px 10px;white-space:nowrap;";
+		const head='<tr>'+columns.map(c=>'<th style="'+HB+'text-align:'+(c.num?'right':'left')+'">'+xlsEsc(c.label)+'</th>').join("")+'</tr>';
+		const body=rows.map(r=>'<tr>'+columns.map(c=>{ const v=c.get(r); const num=c.num&&v!=null&&v!==""&&!isNaN(v);
+			return '<td style="'+CB+'text-align:'+(c.num?'right':'left')+(num?';mso-number-format:General':'')+'">'+xlsEsc(v==null?"":v)+'</td>'; }).join("")+'</tr>').join("");
+		const sheet=xlsEsc((name||"Export").slice(0,28));
+		const html='<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">'
+			+'<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>'+sheet+'</x:Name>'
+			+'<x:WorksheetOptions><x:FreezePanes/><x:SplitHorizontal>1</x:SplitHorizontal><x:TopRowBottomPane>1</x:TopRowBottomPane><x:ActivePane>2</x:ActivePane></x:WorksheetOptions>'
+			+'</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>'
+			+'<body><table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt">'
+			+'<thead>'+head+'</thead><tbody>'+body+'</tbody></table></body></html>';
+		const b=new Blob(["﻿"+html],{type:"application/vnd.ms-excel;charset=utf-8;"}); const u=URL.createObjectURL(b);
+		const a=document.createElement("a"); a.href=u; a.download=(name||"export")+".xls"; document.body.appendChild(a); a.click(); a.remove();
 		setTimeout(()=>URL.revokeObjectURL(u),2000);
 	}
 	// Column filter match. Numeric columns understand >, <, >=, <=, =, != and a..b ranges; else substring.
@@ -660,9 +670,8 @@
 	function exportProducts(){
 		const e=State.pmExport;
 		if(!e||!e.rows){ toast("Nothing to export.","err"); return; }
-		const headers=e.cols.map(c=>c.l);
-		const matrix=e.rows.map(r=>e.cols.map(c=>{ let v; if(c.tag){ v=r.matched?r.item_code:"unmatched"; } else if(c.badge){ v=r.site_status; } else { v=c.g(r); } return v==null?"":v; }));
-		downloadCSV("cscart-products-"+(State.pmMode||"all")+".csv", headers, matrix);
+		const columns=e.cols.map(c=>({ label:c.l, num:!!c.num, get:r=> c.tag ? (r.matched?r.item_code:"unmatched") : c.badge ? r.site_status : c.g(r) }));
+		downloadExcel("cscart-products-"+(State.pmMode||"all"), columns, e.rows);
 	}
 	function renderProductTable(){
 		const m=State.pmData; if(!m) return;
@@ -711,7 +720,7 @@
 		try{
 			const m=await api("get_erp_only",{ only_stock:1, search:$("pmSearch").value, limit:800 });
 			$("pmCounts").innerHTML='<b class="amber">'+m.total+'</b> ERP items with stock but not on the website';
-			State.pmExport={ cols:[{l:"SKU",g:r=>r.sku},{l:"Item Code",g:r=>r.item_code},{l:"Item Name",g:r=>r.item_name},{l:"Brand",g:r=>r.brand},{l:"Item Group",g:r=>r.item_group},{l:"ERP Qty",g:r=>r.erp_qty}], rows:m.rows };
+			State.pmExport={ cols:[{l:"SKU",g:r=>r.sku},{l:"Item Code",g:r=>r.item_code},{l:"Item Name",g:r=>r.item_name},{l:"Brand",g:r=>r.brand},{l:"Item Group",g:r=>r.item_group},{l:"ERP Qty",num:1,g:r=>r.erp_qty}], rows:m.rows };
 			const rows=m.rows.map(r=>'<tr>'+
 				'<td>'+esc(r.sku)+'</td>'+
 				'<td>'+esc(r.item_code)+'</td>'+
@@ -780,9 +789,8 @@
 		const cols=SY_COLS[State.syView||"catalogue"];
 		const rows=State.syExport&&State.syExport.rows;
 		if(!rows){ toast("Nothing to export.","err"); return; }
-		const headers=cols.map(c=>c[1]);
-		const matrix=rows.map(r=>cols.map(c=>{ const v=r[c[0]]; return v==null?"":v; }));
-		downloadCSV("cscart-stylus-"+(State.syView||"catalogue")+".csv", headers, matrix);
+		const columns=cols.map(c=>({ label:c[1], num:["num","money","signed","pct"].indexOf(c[2])>=0, get:r=>r[c[0]] }));
+		downloadExcel("cscart-stylus-"+(State.syView||"catalogue"), columns, rows);
 	}
 	function renderStylusTable(){
 		const cols=SY_COLS[State.syView||"catalogue"];
