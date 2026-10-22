@@ -917,7 +917,7 @@
 			'<div id="itBody"></div>';
 		$("itFrom").value=State.itemFrom||""; $("itTo").value=State.itemTo||"";
 		$("itBack").onclick=()=>{ location.hash="#/stylus/"+(State.syView||"catalogue"); };
-		$("itAll").onclick=()=>{ State.itemFrom=""; State.itemTo=""; $("itFrom").value=""; $("itTo").value=""; loadItem(); };
+		$("itAll").onclick=()=>{ State.itemAll=true; State.itemFrom=""; State.itemTo=""; $("itFrom").value=""; $("itTo").value=""; loadItem(); };
 		$("itExport").onclick=exportItem;
 		$("itFrom").onchange=()=>{ State.itemFrom=$("itFrom").value; loadItem(); };
 		$("itTo").onchange=()=>{ State.itemTo=$("itTo").value; loadItem(); };
@@ -926,10 +926,12 @@
 	}
 	async function loadItem(){
 		$("itChart").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>'; $("itBody").innerHTML="";
+		const allh=State.itemAll?1:0;
 		try{
-			const m=await api("get_stylus_item_series",{ code:State.itemCode, from_date:$("itFrom").value, to_date:$("itTo").value, period:State.itemPeriod });
+			const m=await api("get_stylus_item_series",{ code:State.itemCode, from_date:$("itFrom").value, to_date:$("itTo").value, period:State.itemPeriod, all_history:allh });
 			if(!$("itFrom").value && m.range_from){ $("itFrom").value=m.range_from; State.itemFrom=m.range_from; }
 			if(!$("itTo").value && m.range_to){ $("itTo").value=m.range_to; State.itemTo=m.range_to; }
+			State.itemAll=false;
 			State.itemSeries=m.series||[];
 			renderItem(m);
 		}catch(e){ $("itChart").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }

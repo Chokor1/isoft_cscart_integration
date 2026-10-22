@@ -214,6 +214,12 @@ def _day_bounds(from_date, to_date):
 	return start, end
 
 
+def _month_default():
+	"""Default range = first day of the current month through today."""
+	from frappe.utils import get_first_day, getdate, today
+	return str(get_first_day(getdate(today()))), str(getdate(today()))
+
+
 @frappe.whitelist()
 def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_date=None):
 	"""Stylus views off the latest snapshot:
@@ -230,6 +236,8 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 	limit = cint(limit) or 1000
 
 	if view == "movement":
+		if not from_date and not to_date:
+			from_date, to_date = _month_default()
 		start, end = _day_bounds(from_date, to_date)
 		# Compare the first vs the last snapshot inside the selected window, so a
 		# single day (default = today) shows that day's intraday movement.
@@ -265,7 +273,8 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 		from frappe.utils import getdate
 		return {"rows": rows[:limit], "from_on": str(base[0].taken_on), "to_on": str(cur[0].taken_on),
 			"total": len(rows), "totals": totals,
-			"range_from": str(getdate(base[0].taken_on)), "range_to": str(getdate(cur[0].taken_on))}
+			"range_from": from_date or str(getdate(base[0].taken_on)),
+			"range_to": to_date or str(getdate(cur[0].taken_on))}
 
 	items = frappe.get_all("CSCart Stylus Snapshot Item", filters={"parent": name},
 		fields=["code", "designation", "brand", "family", "price", "stock", "is_active"],
@@ -316,13 +325,15 @@ def _period_key(dt, period):
 
 
 @frappe.whitelist()
-def get_stylus_item_series(code, from_date=None, to_date=None, period="day"):
+def get_stylus_item_series(code, from_date=None, to_date=None, period="day", all_history=0):
 	"""One item's stock/price trajectory across snapshots, bucketed by period
 	(day | week | month) within the date range — the last snapshot in each bucket,
-	with the step-over-step deltas."""
+	with the step-over-step deltas. `all_history` ignores the range (full history)."""
 	_guard()
 	code = (code or "").strip()
 	period = period if period in ("day", "week", "month") else "day"
+	if not cint(all_history) and not from_date and not to_date:
+		from_date, to_date = _month_default()
 	start, end = _day_bounds(from_date, to_date)
 	cond, params = "", {"code": code}
 	if start and end:
@@ -348,8 +359,10 @@ def get_stylus_item_series(code, from_date=None, to_date=None, period="day"):
 		})
 		prev = r
 	from frappe.utils import getdate
-	rf = str(getdate(rows[0].taken_on)) if rows else (from_date or "")
-	rt = str(getdate(rows[-1].taken_on)) if rows else (to_date or "")
+	# Backfill the page's pickers with the requested range (month default), or the
+	# data's actual span when showing all history.
+	rf = from_date or (str(getdate(rows[0].taken_on)) if rows else "")
+	rt = to_date or (str(getdate(rows[-1].taken_on)) if rows else "")
 	return {"code": code, "period": period, "series": series, "range_from": rf, "range_to": rt}
 
 
@@ -367,17 +380,11 @@ def get_stylus_price_log(search=None, from_date=None, to_date=None, days=None, l
 	the price moved), filtered to a from/to date range (falls back to `days` back,
 	then all history)."""
 	_guard()
-	from frappe.utils import getdate, today
 	search = (search or "").strip()
 	limit = cint(limit) or 100000
-	# Default (no range given) = the latest day with changes through today, so it
-	# opens non-empty. Today's data if any, else the most recent change day.
+	# Default (no range given) = first day of the current month through today.
 	if not from_date and not to_date and not days:
-		latest = frappe.get_all("CSCart Stylus Price Log", fields=["changed_on"],
-			order_by="changed_on desc", limit=1)
-		if latest:
-			from_date = str(getdate(latest[0].changed_on))
-			to_date = today()
+		from_date, to_date = _month_default()
 	filters = {}
 	start, end = _day_bounds(from_date, to_date)
 	if start and end:
