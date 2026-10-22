@@ -254,31 +254,29 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 				"note": "Need at least two snapshots in this range — widen the dates."}
 		rows = frappe.db.sql("""
 			select a.code, a.designation,
-			       b.stock as old_stock, a.stock as new_stock, (a.stock-b.stock) as delta,
-			       b.price as old_price, a.price as new_price
+			       b.stock as old_stock, a.stock as new_stock, (a.stock-b.stock) as delta
 			from `tabCSCart Stylus Snapshot Item` a
 			join `tabCSCart Stylus Snapshot Item` b on b.code=a.code and b.parent=%(prev)s
-			where a.parent=%(cur)s and (a.stock != b.stock or a.price != b.price)
-			order by abs(a.stock-b.stock) desc, abs(a.price-b.price) desc
+			where a.parent=%(cur)s and a.stock != b.stock
+			order by abs(a.stock-b.stock) desc
 		""", {"cur": cur[0].name, "prev": base[0].name}, as_dict=True)
 		rows = _sy_search(rows, search, ("code", "designation"))
-		# How many actual change events each item had across all snapshots in the
-		# window (stock or price moved from one snapshot to the next).
+		# How many times each item's STOCK moved across the snapshots in the window.
 		codes = [r.code for r in rows]
 		counts = {}
 		if codes and start and end:
 			hist = frappe.db.sql("""
-				select i.code as code, i.stock as stock, i.price as price
+				select i.code as code, i.stock as stock
 				from `tabCSCart Stylus Snapshot Item` i
 				join `tabCSCart Stylus Snapshot` s on s.name = i.parent
 				where i.code in %(codes)s and s.taken_on between %(s)s and %(e)s
 				order by i.code asc, s.taken_on asc
 			""", {"codes": codes, "s": start, "e": end}, as_dict=True)
-			pc = ps = pp = None
+			pc = ps = None
 			for h in hist:
-				if h.code == pc and (flt(h.stock) != flt(ps) or flt(h.price) != flt(pp)):
+				if h.code == pc and flt(h.stock) != flt(ps):
 					counts[h.code] = counts.get(h.code, 0) + 1
-				pc, ps, pp = h.code, h.stock, h.price
+				pc, ps = h.code, h.stock
 		for r in rows:
 			r["changes"] = counts.get(r.code, 1)
 		totals = {
@@ -286,8 +284,6 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 			"stock_up": sum(1 for r in rows if flt(r.delta) > 0),
 			"stock_down": sum(1 for r in rows if flt(r.delta) < 0),
 			"net_stock": round(sum(flt(r.delta) for r in rows), 2),
-			"price_up": sum(1 for r in rows if flt(r.new_price) - flt(r.old_price) > 0),
-			"price_down": sum(1 for r in rows if flt(r.new_price) - flt(r.old_price) < 0),
 		}
 		from frappe.utils import getdate
 		return {"rows": rows[:limit], "from_on": str(base[0].taken_on), "to_on": str(cur[0].taken_on),

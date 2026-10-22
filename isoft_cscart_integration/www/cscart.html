@@ -784,7 +784,7 @@
 		catalogue:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stock","Stock","num"],["price","Price","money"],["is_active","Status","status"]],
 		vs_erp:[["code","Code"],["designation","Designation","mut"],["stylus_stock","Stylus Stock","num"],["erp_qty","ERP Qty","num"],["qty_diff","Δ Qty","signed"],["qty_diff_pct","Δ Qty %","pct"],["stylus_price","Stylus Price","money"],["erp_price","ERP Price","money"],["price_diff","Δ Price","signed"],["price_diff_pct","Δ Price %","pct"]],
 		not_in_erp:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stylus_stock","Stylus Stock","num"],["stylus_price","Stylus Price","money"]],
-		movement:[["code","Code"],["designation","Designation","mut"],["changes","Changes","num"],["old_stock","Old","num"],["new_stock","New","num"],["delta","Δ Stock","signed"],["old_price","Old Price","money"],["new_price","New Price","money"]],
+		movement:[["code","Code"],["designation","Designation","mut"],["changes","Changes","num"],["old_stock","Old Stock","num"],["new_stock","New Stock","num"],["delta","Δ Stock","signed"]],
 		price_log:[["changed_on","Changed On","dt"],["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["changes","Changes","num"],["old_price","Old Price","money"],["new_price","New Price","money"],["delta","Δ Price","signed"],["pct","Change %","pct"]],
 	};
 	function renderStylus(c){
@@ -792,7 +792,7 @@
 		const seg=(v,l)=>'<button class="seg-b'+(v===sv?" on":"")+'" data-v="'+v+'">'+l+'</button>';
 		c.innerHTML=
 			'<div class="toolbar">'+
-				'<div class="seg" id="syMode">'+seg("catalogue","Catalogue")+seg("vs_erp","vs ERP")+seg("not_in_erp","Not in ERP")+seg("movement","Movement")+seg("price_log","Price Log")+'</div>'+
+				'<div class="seg" id="syMode">'+seg("catalogue","Catalogue")+seg("vs_erp","vs ERP")+seg("not_in_erp","Not in ERP")+seg("movement","Stock Movement")+seg("price_log","Price Log")+'</div>'+
 				'<span id="syRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.82rem;color:var(--ink-2)">From <input type="date" class="inp" id="syFrom" style="width:auto;padding:.3rem .5rem"> to <input type="date" class="inp" id="syTo" style="width:auto;padding:.3rem .5rem"> <button class="btn mini" id="syToday">Today</button></span>'+
 				'<input class="inp" id="sySearch" style="max-width:200px" placeholder="Search code, item or brand…">'+
 				'<button class="btn" id="syReload"><i class="fa-solid fa-rotate"></i> Reload</button>'+
@@ -850,7 +850,7 @@
 		}else{
 			const net=t.net_stock||0;
 			el.innerHTML = pill("Changed",t.changed||0) + pill("Stock ▲",t.stock_up||0,"up") + pill("Stock ▼",t.stock_down||0,"dn")
-				+ pill("Net stock",(net>0?"+":"")+net, net>0?"up":net<0?"dn":"") + pill("Price ▲",t.price_up||0,"dn") + pill("Price ▼",t.price_down||0,"up");
+				+ pill("Net stock",(net>0?"+":"")+net, net>0?"up":net<0?"dn":"");
 		}
 	}
 	function exportStylus(){
@@ -941,14 +941,14 @@
 		const s=m.series||[];
 		$("itChart").innerHTML = lineChart(s);
 		$("itInfo").innerHTML = s.length? ('<b>'+s.length+'</b> '+({day:"day",week:"week",month:"month"}[State.itemPeriod])+'(s)') : '';
+		const priceCell=(r)=>{ if(r.d_price!=null && r.d_price!==0){ const old=r.price-r.d_price; return '<td class="num"><span class="mut">'+pmMoney(old)+'</span> → <b class="'+(r.d_price<0?"d-up":"d-dn")+'">'+pmMoney(r.price)+'</b></td>'; } return '<td class="num">'+pmMoney(r.price)+'</td>'; };
 		const body=s.map(r=>'<tr>'+
 			'<td>'+esc(r.period)+'</td>'+
 			'<td class="num">'+(r.stock==null?"—":r.stock)+'</td>'+
 			'<td class="num '+dcls(r.d_stock,false)+'">'+(r.d_stock==null?"—":pmSigned(r.d_stock))+'</td>'+
-			'<td class="num">'+pmMoney(r.price)+'</td>'+
-			'<td class="num '+dcls(r.d_price,true)+'">'+(r.d_price==null?"—":pmSigned(r.d_price))+'</td>'+
-			'</tr>').join("") || '<tr><td colspan="5" class="empty"><i class="fa-solid fa-chart-line"></i>No snapshots for this item in the selected range.</td></tr>';
-		$("itBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Period</th><th class="num">Stock</th><th class="num">Δ Stock</th><th class="num">Price</th><th class="num">Δ Price</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+			priceCell(r)+
+			'</tr>').join("") || '<tr><td colspan="4" class="empty"><i class="fa-solid fa-chart-line"></i>No snapshots for this item in the selected range.</td></tr>';
+		$("itBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Period</th><th class="num">Stock</th><th class="num">Δ Stock</th><th class="num">Price</th></tr></thead><tbody>'+body+'</tbody></table></div>';
 	}
 	function exportItem(){
 		const s=State.itemSeries||[]; if(!s.length){ toast("Nothing to export.","err"); return; }
