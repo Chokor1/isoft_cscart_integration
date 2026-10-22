@@ -167,6 +167,13 @@
 	.tbl td.d-up{color:var(--ok);font-weight:700;} .tbl td.d-dn{color:var(--red);font-weight:700;}
 	.lnk{color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none;border-bottom:1px solid currentColor;} .lnk:hover{color:var(--accent-ink);}
 	.ld-row td{text-align:center;color:var(--muted);font-size:.78rem;padding:10px;} .ld-row i{margin-right:6px;}
+	.chart-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow-sm);padding:16px 18px;margin-bottom:16px;}
+	.chart-legend{display:flex;gap:16px;font-size:.78rem;font-weight:600;color:var(--ink-2);margin-bottom:4px;}
+	.chart-legend span{display:inline-flex;align-items:center;gap:6px;} .chart-legend i{width:14px;height:3px;border-radius:2px;display:inline-block;}
+	.chart{width:100%;height:auto;max-height:300px;display:block;overflow:visible;}
+	.chart .ln-stock{stroke:var(--sky);stroke-width:2;} .chart .ln-price{stroke:var(--amber);stroke-width:2;}
+	.chart .dot-stock{fill:var(--sky);} .chart .dot-price{fill:var(--amber);}
+	.chart .grd{stroke:var(--line-2);stroke-width:1;} .chart .ax{fill:var(--ink-3);font-size:11px;font-weight:600;}
 	.totals{display:flex;gap:9px;flex-wrap:wrap;margin:-4px 0 14px;}
 	.totals:empty{display:none;}
 	.tpill{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:.78rem;font-weight:600;color:var(--ink-3);}
@@ -322,6 +329,7 @@
 		$("who").textContent = window.CS_USER || "";
 		$("nav").innerHTML = TABS.map(t=>'<div class="nav-i" data-tab="'+t[0]+'"><i class="fa-solid '+t[1]+'"></i><span>'+t[2]+'</span><span class="cnt" data-cnt="'+t[0]+'" style="display:none"></span></div>').join("");
 		document.querySelectorAll(".nav-i").forEach(n=>n.onclick=()=>switchTab(n.dataset.tab));
+		window.addEventListener("hashchange", route);
 		document.querySelector(".tools").addEventListener("click",(e)=>{ const b=e.target.closest("[data-act]"); if(!b) return; const a=b.dataset.act; if(a==="fs")toggleFs(); if(a==="test")doTest(); if(a==="refresh")doRefresh(); if(a==="full")doSync(1); if(a==="sync")doSync(0); });
 		document.addEventListener("fullscreenchange",()=>{ const i=document.querySelector('[data-act="fs"] i'); if(i) i.className = document.fullscreenElement?"fa-solid fa-compress":"fa-solid fa-expand"; });
 		$("ov").addEventListener("click",(e)=>{ if(e.target.id==="ov"||e.target.hasAttribute("data-close")) closeModal(); });
@@ -330,11 +338,23 @@
 	}
 
 	async function load(){
-		try{ State.data = await api("get_state"); render(); }
+		try{ State.data = await api("get_state"); route(); }
 		catch(e){ $("canvas").innerHTML = '<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
 	}
 
-	function switchTab(tab){ State.tab=tab; render(); }
+	const ROUTES = ["dashboard","products","stylus","settings","logs"];
+	function switchTab(tab){ location.hash = "#/"+tab; }   // -> hashchange -> route()
+	function navItem(code){ location.hash = "#/item/"+encodeURIComponent(code); }
+	function route(){
+		if(!State.data) return;
+		const parts = (location.hash||"").replace(/^#\/?/,"").split("/").filter(Boolean).map(decodeURIComponent);
+		const tab = parts[0] || "dashboard";
+		if(tab==="item" && parts[1]){ renderItemPage(parts[1]); return; }
+		State.tab = ROUTES.indexOf(tab)>=0 ? tab : "dashboard";
+		if(State.tab==="products" && parts[1]){ State.pmMode=parts[1]; lsSet("cscart_pm_mode",parts[1]); }
+		if(State.tab==="stylus" && parts[1]){ State.syView=parts[1]; lsSet("cscart_sy_view",parts[1]); }
+		render();
+	}
 
 	function render(){
 		if(!State.data) return;
@@ -598,7 +618,7 @@
 				'<span class="mut" id="pmCounts" style="margin-left:auto;font-size:.8rem"></span>'+
 			'</div><div id="pmBody"></div>';
 		$("pmFetch").onclick=async()=>{ try{ await api("refresh_map",{},true); toast("Fetching the catalogue from the website… this runs in the background, press Reload in a moment.","info"); setTimeout(runProducts,6000); }catch(e){ toast(e.message,"err"); } };
-		c.querySelectorAll("#pmMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#pmMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.pmMode=b.dataset.m; lsSet("cscart_pm_mode",State.pmMode); runProducts(); });
+		c.querySelectorAll("#pmMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#pmMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.pmMode=b.dataset.m; lsSet("cscart_pm_mode",State.pmMode); try{history.replaceState(null,"","#/products/"+State.pmMode);}catch(e){} runProducts(); });
 		$("pmHide").onchange=(e)=>{ State.pmHideDisabled=e.target.checked; lsSet("cscart_pm_hide_disabled", e.target.checked?"1":"0"); runProducts(); };
 		$("pmHideZero").onchange=(e)=>{ State.pmHideZero=e.target.checked; lsSet("cscart_pm_hide_zero", e.target.checked?"1":"0"); runProducts(); };
 		$("pmExport").onclick=exportProducts;
@@ -781,7 +801,7 @@
 				'<span class="mut" id="syInfo" style="margin-left:auto;font-size:.8rem"></span>'+
 				'<span class="mut" id="syShown" style="font-size:.8rem"></span>'+
 			'</div><div id="syTotals" class="totals"></div><div id="syBody"></div>';
-		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; const sf=$("syFrom"); if(sf){ sf.value=""; $("syTo").value=""; } lsSet("cscart_sy_view",State.syView); runStylus(); });
+		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; const sf=$("syFrom"); if(sf){ sf.value=""; $("syTo").value=""; } lsSet("cscart_sy_view",State.syView); try{history.replaceState(null,"","#/stylus/"+State.syView);}catch(e){} runStylus(); });
 		$("sySnap").onclick=async()=>{ try{ await api("snapshot_stylus_now",{},true); toast("Stylus snapshot queued — press Reload in a moment.","info"); setTimeout(runStylus,6000); }catch(e){ toast(e.message,"err"); } };
 		$("syExport").onclick=exportStylus;
 		$("syReload").onclick=runStylus;
@@ -872,23 +892,52 @@
 		mount();
 		$("syBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(State.sySort.k===k)State.sySort.dir*=-1; else State.sySort={k,dir:1}; renderStylusTable(); });
 		$("syBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.syFilters[inp.dataset.f]=inp.value; mount(); });
-		$("syBody").onclick=(e)=>{ const a=e.target.closest(".sy-drill"); if(a){ e.preventDefault(); syDrill(a.dataset.code); } };
+		$("syBody").onclick=(e)=>{ const a=e.target.closest(".sy-drill"); if(a){ e.preventDefault(); navItem(a.dataset.code); } };
 	}
-	async function syDrill(code){
-		State.drillCode=code; State.drillPeriod=State.drillPeriod||"day";
-		modal(code+" — breakdown", '<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>');
-		loadDrill();
+	// ---------------- item page (stock & price history + chart) ----------------
+	function renderItemPage(code){
+		if(State.itemCode!==code){ State.itemFrom=""; State.itemTo=""; }
+		State.itemCode=code; State.itemPeriod=State.itemPeriod||"day";
+		$("pageTitle").textContent="Item "+code; $("pageSub").textContent="Stylus stock & price history";
+		document.querySelectorAll(".nav-i").forEach(n=>n.classList.toggle("on", n.dataset.tab==="stylus"));
+		renderPills(); renderConn();
+		const today=new Date().toISOString().slice(0,10);
+		const seg=(p,l)=>'<button class="seg-b'+(State.itemPeriod===p?" on":"")+'" data-p="'+p+'">'+l+'</button>';
+		const c=$("canvas");
+		c.innerHTML=
+			'<div class="toolbar">'+
+				'<button class="btn" id="itBack"><i class="fa-solid fa-arrow-left"></i> Back to Stylus</button>'+
+				'<div class="seg" id="itPeriod">'+seg("day","Daily")+seg("week","Weekly")+seg("month","Monthly")+'</div>'+
+				'<span style="font-size:.82rem;color:var(--ink-2)">From <input type="date" class="inp" id="itFrom" style="width:auto;padding:.3rem .5rem"> to <input type="date" class="inp" id="itTo" style="width:auto;padding:.3rem .5rem"></span>'+
+				'<button class="btn mini" id="itAll">All</button>'+
+				'<button class="btn" id="itExport"><i class="fa-solid fa-file-csv"></i> Export</button>'+
+				'<span class="mut" id="itInfo" style="margin-left:auto;font-size:.8rem"></span>'+
+			'</div>'+
+			'<div class="chart-card"><div class="chart-legend"><span><i style="background:var(--sky)"></i>Stock</span><span><i style="background:var(--amber)"></i>Price</span></div><div id="itChart"></div></div>'+
+			'<div id="itBody"></div>';
+		$("itFrom").value=State.itemFrom||""; $("itTo").value=State.itemTo||"";
+		$("itBack").onclick=()=>{ location.hash="#/stylus/"+(State.syView||"catalogue"); };
+		$("itAll").onclick=()=>{ State.itemFrom=""; State.itemTo=""; $("itFrom").value=""; $("itTo").value=""; loadItem(); };
+		$("itExport").onclick=exportItem;
+		$("itFrom").onchange=()=>{ State.itemFrom=$("itFrom").value; loadItem(); };
+		$("itTo").onchange=()=>{ State.itemTo=$("itTo").value; loadItem(); };
+		c.querySelectorAll("#itPeriod .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#itPeriod .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.itemPeriod=b.dataset.p; loadItem(); });
+		loadItem();
 	}
-	async function loadDrill(){
-		const from=$("syFrom")?$("syFrom").value:"", to=$("syTo")?$("syTo").value:"";
+	async function loadItem(){
+		$("itChart").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>'; $("itBody").innerHTML="";
 		try{
-			const m=await api("get_stylus_item_series",{ code:State.drillCode, from_date:from, to_date:to, period:State.drillPeriod });
-			renderDrill(m);
-		}catch(e){ $("modalBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
+			const m=await api("get_stylus_item_series",{ code:State.itemCode, from_date:$("itFrom").value, to_date:$("itTo").value, period:State.itemPeriod });
+			if(!$("itFrom").value && m.range_from){ $("itFrom").value=m.range_from; State.itemFrom=m.range_from; }
+			if(!$("itTo").value && m.range_to){ $("itTo").value=m.range_to; State.itemTo=m.range_to; }
+			State.itemSeries=m.series||[];
+			renderItem(m);
+		}catch(e){ $("itChart").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
 	}
-	function renderDrill(m){
-		const seg=(p,l)=>'<button class="seg-b'+(State.drillPeriod===p?" on":"")+'" data-p="'+p+'">'+l+'</button>';
+	function renderItem(m){
 		const s=m.series||[];
+		$("itChart").innerHTML = lineChart(s);
+		$("itInfo").innerHTML = s.length? ('<b>'+s.length+'</b> '+({day:"day",week:"week",month:"month"}[State.itemPeriod])+'(s)') : '';
 		const body=s.map(r=>'<tr>'+
 			'<td>'+esc(r.period)+'</td>'+
 			'<td class="num">'+(r.stock==null?"—":r.stock)+'</td>'+
@@ -896,10 +945,32 @@
 			'<td class="num">'+pmMoney(r.price)+'</td>'+
 			'<td class="num '+dcls(r.d_price,true)+'">'+(r.d_price==null?"—":pmSigned(r.d_price))+'</td>'+
 			'</tr>').join("") || '<tr><td colspan="5" class="empty"><i class="fa-solid fa-chart-line"></i>No snapshots for this item in the selected range.</td></tr>';
-		$("modalBody").innerHTML='<div class="seg" style="margin-bottom:14px">'+seg("day","Daily")+seg("week","Weekly")+seg("month","Monthly")+'</div>'+
-			'<div class="tbl-wrap" style="max-height:60vh"><table class="tbl"><thead><tr><th>Period</th><th class="num">Stock</th><th class="num">Δ Stock</th><th class="num">Price</th><th class="num">Δ Price</th></tr></thead><tbody>'+body+'</tbody></table></div>';
-		$("modalTitle").innerHTML=esc(m.code+" — "+({day:"daily",week:"weekly",month:"monthly"}[State.drillPeriod]||"daily")+" breakdown")+' <i class="fa-solid fa-xmark" data-close></i>';
-		$("modalBody").querySelectorAll(".seg-b").forEach(b=>b.onclick=()=>{ State.drillPeriod=b.dataset.p; loadDrill(); });
+		$("itBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Period</th><th class="num">Stock</th><th class="num">Δ Stock</th><th class="num">Price</th><th class="num">Δ Price</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+	}
+	function exportItem(){
+		const s=State.itemSeries||[]; if(!s.length){ toast("Nothing to export.","err"); return; }
+		const cols=[{label:"Period",num:false,get:r=>r.period},{label:"Stock",num:true,get:r=>r.stock},{label:"Δ Stock",num:true,get:r=>r.d_stock},{label:"Price",num:true,get:r=>r.price},{label:"Δ Price",num:true,get:r=>r.d_price}];
+		downloadExcel("cscart-item-"+(State.itemCode||"")+"-"+State.itemPeriod, cols, s);
+	}
+	// Dependency-free dual-line SVG chart (stock on left scale, price on right scale).
+	function lineChart(series){
+		if(!series.length) return '<div class="empty" style="padding:28px"><i class="fa-solid fa-chart-line"></i>No data to chart.</div>';
+		const W=860,H=260,L=46,R=46,T=18,B=34, n=series.length;
+		const X=i=> n<=1 ? (L+(W-L-R)/2) : L+i*(W-L-R)/(n-1);
+		const st=series.map(d=>d.stock), pr=series.map(d=>d.price);
+		const mm=a=>[Math.min.apply(null,a),Math.max.apply(null,a)];
+		const [sl,sh]=mm(st), [pl,ph]=mm(pr);
+		const Ys=v=>{const r=(sh-sl)||1; return (H-B-(v-sl)/r*(H-T-B));};
+		const Yp=v=>{const r=(ph-pl)||1; return (H-B-(v-pl)/r*(H-T-B));};
+		const line=(Y,arr)=>arr.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1)).join(" ");
+		const dots=(Y,arr,cls)=>arr.map((v,i)=>'<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="3" class="'+cls+'"><title>'+esc(series[i].period)+'</title></circle>').join("");
+		let grid=""; for(let g=0;g<=4;g++){ const y=(T+g*(H-T-B)/4).toFixed(1); grid+='<line class="grd" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>'; }
+		const idxs=[...new Set([0, Math.floor((n-1)/2), n-1])];
+		const xlab=idxs.map(i=>'<text x="'+X(i).toFixed(1)+'" y="'+(H-12)+'" text-anchor="middle" class="ax">'+esc(series[i].period)+'</text>').join("");
+		return '<svg viewBox="0 0 '+W+' '+H+'" class="chart" preserveAspectRatio="xMidYMid meet">'+grid
+			+'<path d="'+line(Ys,st)+'" class="ln-stock" fill="none"/>'+'<path d="'+line(Yp,pr)+'" class="ln-price" fill="none"/>'
+			+dots(Ys,st,"dot-stock")+dots(Yp,pr,"dot-price")
+			+'<text x="'+L+'" y="12" class="ax">Stock</text><text x="'+(W-R)+'" y="12" text-anchor="end" class="ax">Price</text>'+xlab+'</svg>';
 	}
 
 	// ---------------- logs ----------------

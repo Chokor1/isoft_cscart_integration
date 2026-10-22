@@ -347,7 +347,10 @@ def get_stylus_item_series(code, from_date=None, to_date=None, period="day"):
 			"d_price": round(flt(r.price) - flt(prev.price), 2) if prev else None,
 		})
 		prev = r
-	return {"code": code, "period": period, "series": series}
+	from frappe.utils import getdate
+	rf = str(getdate(rows[0].taken_on)) if rows else (from_date or "")
+	rt = str(getdate(rows[-1].taken_on)) if rows else (to_date or "")
+	return {"code": code, "period": period, "series": series, "range_from": rf, "range_to": rt}
 
 
 @frappe.whitelist()
