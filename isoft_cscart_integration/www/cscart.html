@@ -165,6 +165,8 @@
 	input.col-f:focus{outline:none;border-color:var(--accent);}
 	.mut{color:var(--muted);} .diff{color:var(--accent);font-weight:700;} .amber{color:var(--amber);font-weight:600;}
 	.tbl td.d-up{color:var(--ok);font-weight:700;} .tbl td.d-dn{color:var(--red);font-weight:700;}
+	.lnk{color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none;border-bottom:1px solid currentColor;} .lnk:hover{color:var(--accent-ink);}
+	.ld-row td{text-align:center;color:var(--muted);font-size:.78rem;padding:10px;} .ld-row i{margin-right:6px;}
 	.row-un{background:var(--row-un);}
 	.badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--chip-2);color:var(--ink-3);}
 	.b-A,.b-Approved,.b-Success{background:var(--ok-soft);color:#15803d;}
@@ -628,6 +630,28 @@
 		const a=document.createElement("a"); a.href=u; a.download=(name||"export")+".xls"; document.body.appendChild(a); a.click(); a.remove();
 		setTimeout(()=>URL.revokeObjectURL(u),2000);
 	}
+	// Progressively fill a scrollable table body: render a first page, append more
+	// as the user scrolls near the bottom, with a "Show all" shortcut. `full` is
+	// the complete (filtered+sorted) row list; export always uses the full list.
+	function mountRows(wrap, tbody, full, rowFn, shownEl, emptyHtml, noun){
+		const PAGE=200, ncols=(tbody.closest("table").querySelectorAll("thead tr:first-child th").length)||1;
+		let all=false, shown=Math.min(PAGE, full.length);
+		const more='<tr class="ld-row more"><td colspan="'+ncols+'"><i class="fa-solid fa-angles-down"></i>scroll for more…</td></tr>';
+		const count=()=>{ if(!shownEl) return;
+			if(shown<full.length){ shownEl.innerHTML='Showing <b>'+shown+'</b> of '+full.length+' · <a class="lnk" data-all="1">Show all</a>';
+				const a=shownEl.querySelector("[data-all]"); if(a) a.onclick=()=>{ all=true; shown=full.length; tbody.innerHTML=full.map(rowFn).join(""); count(); };
+			} else shownEl.textContent=full.length+' '+(noun||'rows'); };
+		const paint=()=>{ tbody.innerHTML = full.length ? full.slice(0,shown).map(rowFn).join("")+(shown<full.length?more:"") : emptyHtml; count(); };
+		paint();
+		try{ wrap.scrollTop=0; }catch(e){}
+		wrap.onscroll=()=>{ if(all||shown>=full.length) return;
+			if(wrap.scrollTop+wrap.clientHeight >= wrap.scrollHeight-340){
+				const from=shown; shown=Math.min(shown+PAGE, full.length);
+				const mr=tbody.querySelector("tr.more"); if(mr) mr.remove();
+				tbody.insertAdjacentHTML("beforeend", full.slice(from,shown).map(rowFn).join("")+(shown<full.length?more:""));
+				count();
+			} };
+	}
 	// Column filter match. Numeric columns understand >, <, >=, <=, =, != and a..b ranges; else substring.
 	function colMatch(text, v, isNum){
 		const t=(text||"").trim(); if(!t) return true;
@@ -686,23 +710,22 @@
 			const dc=c.diff?dcls(v,c.invert):"";
 			const cls=((c.num?"num ":"")+(c.cls||"")+(dc?" "+dc:"")+(c.strong?" strong":"")).trim();
 			return '<td'+(cls?' class="'+cls+'"':'')+'>'+disp+'</td>'; };
-		const CAP=600;
 		const view=()=>{ let rows=(m.rows||[]).slice();
 			const q=(State.pmSearch||"").trim().toLowerCase();
 			if(q) rows=rows.filter(r=>((r.sku||"")+" "+(r.item_code||"")+" "+(r.product_name||"")).toLowerCase().indexOf(q)>=0);
 			Object.keys(State.pmFilters).forEach(k=>{ const t=State.pmFilters[k]; if(!t||!t.trim())return; const c=byKey[k]; if(!c)return; rows=rows.filter(r=>colMatch(t, c.g(r), !!c.num)); });
 			if(sort.k){ const col=byKey[sort.k]; if(col) rows.sort((a,b)=>{ let x=col.g(a),y=col.g(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; }); }
 			return rows; };
-		const buildBody=(rows)=>rows.map(r=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>').join("")
-			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>';
-		const draw=()=>{ const full=view(); State.pmExport={cols, rows:full};
-			const sh=$("pmShown"); if(sh) sh.innerHTML = full.length>CAP ? '<span class="amber">showing '+CAP+' of '+full.length+' — refine to see more</span>' : (full.length+' shown');
-			return buildBody(full.length>CAP?full.slice(0,CAP):full); };
+		const rowFn=(r)=>'<tr class="'+(r.matched?"":"row-un")+'">'+cols.map(c=>cell(c,r)).join("")+'</tr>';
+		const emptyHtml='<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-box-open"></i>No rows match.</td></tr>';
 		const filterRow='<tr class="filter-row">'+cols.map(c=>'<th'+(c.num?' class="num"':'')+'><input class="col-f" data-f="'+c.k+'" value="'+esc(State.pmFilters[c.k]||"")+'" placeholder="'+(c.num?'&gt;0  &lt;5  1..9':'filter')+'"></th>').join("")+'</tr>';
 		const headRow='<tr>'+cols.map(c=>{ const a=sort.k===c.k; return '<th class="'+(c.num?"num ":"")+'sortable'+(a?" sorted":"")+'" data-sort="'+c.k+'">'+esc(c.l)+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
-		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+draw()+'</tbody></table></div>';
+		$("pmBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody></tbody></table></div>';
+		const wrap=$("pmBody").querySelector(".tbl-wrap"), tbody=$("pmBody").querySelector("tbody");
+		const mount=()=>{ const full=view(); State.pmExport={cols, rows:full}; mountRows(wrap, tbody, full, rowFn, $("pmShown"), emptyHtml, "products"); };
+		mount();
 		$("pmBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; if(State.pmSort.k===k)State.pmSort.dir*=-1; else State.pmSort={k,dir:1}; renderProductTable(); });
-		$("pmBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.pmFilters[inp.dataset.f]=inp.value; const tb=$("pmBody").querySelector("tbody"); if(tb) tb.innerHTML=draw(); });
+		$("pmBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.pmFilters[inp.dataset.f]=inp.value; mount(); });
 	}
 	async function runProducts(){
 		if((State.pmMode||"all")==="missing") return runMissing();
@@ -806,7 +829,6 @@
 			if(t==="num") return '<td class="num">'+(v==null?"—":v)+'</td>';
 			if(t==="mut") return '<td class="mut">'+esc((v||"").slice(0,46))+'</td>';
 			return '<td>'+esc(v==null?"":v)+'</td>'; };
-		const CAP=600;
 		const keys=cols.map(c=>c[0]);
 		const view=()=>{ let rows=(State.syRows||[]).slice();
 			const q=(State.sySearch||"").trim().toLowerCase();
@@ -814,16 +836,16 @@
 			Object.keys(State.syFilters).forEach(k=>{ const t=State.syFilters[k]; if(!t||!t.trim())return; const col=cols.find(cc=>cc[0]===k); const isNum=col?["num","money","signed","pct"].indexOf(col[2])>=0:false; rows=rows.filter(r=>colMatch(t, r[k], isNum)); });
 			if(sort.k) rows.sort((a,b)=>{ let x=a[sort.k],y=b[sort.k]; if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="string"||typeof y==="string"){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); return x<y?-sort.dir:x>y?sort.dir:0; } return (x-y)*sort.dir; });
 			return rows; };
-		const buildBody=(rows)=>rows.map(r=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>').join("")
-			||'<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
-		const draw=()=>{ const full=view(); State.syExport={rows:full};
-			const sh=$("syShown"); if(sh) sh.innerHTML = full.length>CAP ? '<span class="amber">showing '+CAP+' of '+full.length+' — refine to see more</span>' : (full.length+' shown');
-			return buildBody(full.length>CAP?full.slice(0,CAP):full); };
+		const rowFn=(r)=>'<tr>'+cols.map(col=>cell(col,r)).join("")+'</tr>';
+		const emptyHtml='<tr><td colspan="'+cols.length+'" class="empty"><i class="fa-solid fa-industry"></i>Nothing to show.</td></tr>';
 		const filterRow='<tr class="filter-row">'+cols.map(col=>{ const n=["num","money","signed","pct"].indexOf(col[2])>=0; return '<th'+(n?' class="num"':'')+'><input class="col-f" data-f="'+col[0]+'" value="'+esc(State.syFilters[col[0]]||"")+'" placeholder="'+(n?'&gt;0  &lt;5  1..9':'filter')+'"></th>'; }).join("")+'</tr>';
 		const headRow='<tr>'+cols.map(col=>{ const a=sort.k===col[0]; return '<th class="sortable'+(["num","money","signed","pct"].indexOf(col[2])>=0?" num":"")+(a?" sorted":"")+'" data-k="'+col[0]+'">'+col[1]+(a?(sort.dir>0?' ▲':' ▼'):'')+'</th>'; }).join("")+'</tr>';
-		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody>'+draw()+'</tbody></table></div>';
+		$("syBody").innerHTML='<div class="tbl-wrap"><table class="tbl"><thead>'+headRow+filterRow+'</thead><tbody></tbody></table></div>';
+		const wrap=$("syBody").querySelector(".tbl-wrap"), tbody=$("syBody").querySelector("tbody");
+		const mount=()=>{ const full=view(); State.syExport={rows:full}; mountRows(wrap, tbody, full, rowFn, $("syShown"), emptyHtml, "rows"); };
+		mount();
 		$("syBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(State.sySort.k===k)State.sySort.dir*=-1; else State.sySort={k,dir:1}; renderStylusTable(); });
-		$("syBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.syFilters[inp.dataset.f]=inp.value; const tb=$("syBody").querySelector("tbody"); if(tb) tb.innerHTML=draw(); });
+		$("syBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.syFilters[inp.dataset.f]=inp.value; mount(); });
 	}
 
 	// ---------------- logs ----------------
