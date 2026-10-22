@@ -844,7 +844,9 @@
 		const sort=State.sySort||(State.sySort={k:null,dir:1});
 		State.syFilters=State.syFilters||{};
 		const priceView=(State.syView==="price_log");
+		const drillable=(State.syView==="movement"||State.syView==="price_log");
 		const cell=(col,r)=>{ const t=col[2]; const v=r[col[0]];
+			if(col[0]==="code"&&drillable) return '<td><a class="lnk sy-drill" data-code="'+esc(v==null?"":v)+'">'+esc(v==null?"":v)+' <i class="fa-solid fa-chart-line" style="font-size:.68rem;opacity:.55"></i></a></td>';
 			if(t==="status") return '<td><span class="badge '+(v?"b-A":"b-D")+'">'+(v?"Active":"Inactive")+'</span></td>';
 			if(t==="dt") return '<td>'+esc(fmtDt(v))+'</td>';
 			if(t==="money") return '<td class="num">'+pmMoney(v)+'</td>';
@@ -870,6 +872,34 @@
 		mount();
 		$("syBody").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(State.sySort.k===k)State.sySort.dir*=-1; else State.sySort={k,dir:1}; renderStylusTable(); });
 		$("syBody").querySelectorAll("input.col-f").forEach(inp=>inp.oninput=()=>{ State.syFilters[inp.dataset.f]=inp.value; mount(); });
+		$("syBody").onclick=(e)=>{ const a=e.target.closest(".sy-drill"); if(a){ e.preventDefault(); syDrill(a.dataset.code); } };
+	}
+	async function syDrill(code){
+		State.drillCode=code; State.drillPeriod=State.drillPeriod||"day";
+		modal(code+" — breakdown", '<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>');
+		loadDrill();
+	}
+	async function loadDrill(){
+		const from=$("syFrom")?$("syFrom").value:"", to=$("syTo")?$("syTo").value:"";
+		try{
+			const m=await api("get_stylus_item_series",{ code:State.drillCode, from_date:from, to_date:to, period:State.drillPeriod });
+			renderDrill(m);
+		}catch(e){ $("modalBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
+	}
+	function renderDrill(m){
+		const seg=(p,l)=>'<button class="seg-b'+(State.drillPeriod===p?" on":"")+'" data-p="'+p+'">'+l+'</button>';
+		const s=m.series||[];
+		const body=s.map(r=>'<tr>'+
+			'<td>'+esc(r.period)+'</td>'+
+			'<td class="num">'+(r.stock==null?"—":r.stock)+'</td>'+
+			'<td class="num '+dcls(r.d_stock,false)+'">'+(r.d_stock==null?"—":pmSigned(r.d_stock))+'</td>'+
+			'<td class="num">'+pmMoney(r.price)+'</td>'+
+			'<td class="num '+dcls(r.d_price,true)+'">'+(r.d_price==null?"—":pmSigned(r.d_price))+'</td>'+
+			'</tr>').join("") || '<tr><td colspan="5" class="empty"><i class="fa-solid fa-chart-line"></i>No snapshots for this item in the selected range.</td></tr>';
+		$("modalBody").innerHTML='<div class="seg" style="margin-bottom:14px">'+seg("day","Daily")+seg("week","Weekly")+seg("month","Monthly")+'</div>'+
+			'<div class="tbl-wrap" style="max-height:60vh"><table class="tbl"><thead><tr><th>Period</th><th class="num">Stock</th><th class="num">Δ Stock</th><th class="num">Price</th><th class="num">Δ Price</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+		$("modalTitle").innerHTML=esc(m.code+" — "+({day:"daily",week:"weekly",month:"monthly"}[State.drillPeriod]||"daily")+" breakdown")+' <i class="fa-solid fa-xmark" data-close></i>';
+		$("modalBody").querySelectorAll(".seg-b").forEach(b=>b.onclick=()=>{ State.drillPeriod=b.dataset.p; loadDrill(); });
 	}
 
 	// ---------------- logs ----------------

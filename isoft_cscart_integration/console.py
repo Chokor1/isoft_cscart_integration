@@ -304,6 +304,52 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 	return {"rows": rows[:limit], "taken_on": str(snap["taken_on"]), "total": len(rows)}
 
 
+def _period_key(dt, period):
+	from frappe.utils import getdate
+	d = getdate(dt)
+	if period == "month":
+		return d.strftime("%Y-%m")
+	if period == "week":
+		iso = d.isocalendar()
+		return "%d-W%02d" % (iso[0], iso[1])
+	return d.strftime("%Y-%m-%d")
+
+
+@frappe.whitelist()
+def get_stylus_item_series(code, from_date=None, to_date=None, period="day"):
+	"""One item's stock/price trajectory across snapshots, bucketed by period
+	(day | week | month) within the date range — the last snapshot in each bucket,
+	with the step-over-step deltas."""
+	_guard()
+	code = (code or "").strip()
+	period = period if period in ("day", "week", "month") else "day"
+	start, end = _day_bounds(from_date, to_date)
+	cond, params = "", {"code": code}
+	if start and end:
+		cond = "and s.taken_on between %(s)s and %(e)s"
+		params["s"], params["e"] = start, end
+	rows = frappe.db.sql("""
+		select s.taken_on as taken_on, i.stock as stock, i.price as price
+		from `tabCSCart Stylus Snapshot Item` i
+		join `tabCSCart Stylus Snapshot` s on s.name = i.parent
+		where i.code = %(code)s {0}
+		order by s.taken_on asc
+	""".format(cond), params, as_dict=True)
+	buckets = {}
+	for r in rows:
+		buckets[_period_key(r.taken_on, period)] = r  # ascending -> last in bucket wins
+	series, prev = [], None
+	for key in sorted(buckets):
+		r = buckets[key]
+		series.append({
+			"period": key, "stock": flt(r.stock), "price": flt(r.price),
+			"d_stock": round(flt(r.stock) - flt(prev.stock), 2) if prev else None,
+			"d_price": round(flt(r.price) - flt(prev.price), 2) if prev else None,
+		})
+		prev = r
+	return {"code": code, "period": period, "series": series}
+
+
 @frappe.whitelist()
 def snapshot_stylus_now():
 	_guard()
