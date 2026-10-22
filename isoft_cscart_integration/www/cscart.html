@@ -603,11 +603,14 @@
 	const pmPct=(x)=>x==null?"—":(x>0?"+":"")+Number(x).toLocaleString(undefined,{maximumFractionDigits:1})+"%";
 	// Δ cell colour. Default: positive=green (more), negative=red (less). invert (price): less=green, more=red.
 	const dcls=(v,invert)=>{ if(!v) return ""; const good = invert ? v<0 : v>0; return good?"d-up":"d-dn"; };
-	// CSV export (BOM so Excel reads UTF-8).
-	const csvEsc=(v)=>{ v=(v==null?"":String(v)); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+	// CSV export. Semicolon-separated + a "sep=;" hint and a UTF-8 BOM so Excel
+	// (incl. locales whose list separator is ";") splits it into columns.
+	const CSV_SEP=";";
+	const csvEsc=(v)=>{ v=(v==null?"":String(v)); return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
 	function downloadCSV(name, headers, matrix){
 		if(!matrix||!matrix.length){ toast("Nothing to export.","err"); return; }
-		const txt=[headers.map(csvEsc).join(",")].concat(matrix.map(r=>r.map(csvEsc).join(","))).join("\r\n");
+		const body=[headers.map(csvEsc).join(CSV_SEP)].concat(matrix.map(r=>r.map(csvEsc).join(CSV_SEP))).join("\r\n");
+		const txt="sep="+CSV_SEP+"\r\n"+body;
 		const b=new Blob(["﻿"+txt],{type:"text/csv;charset=utf-8;"}); const u=URL.createObjectURL(b);
 		const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
 		setTimeout(()=>URL.revokeObjectURL(u),2000);
