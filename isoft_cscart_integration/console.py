@@ -43,6 +43,18 @@ def _guard():
 		frappe.throw(_("You are not permitted to use the CS-Cart console."), frappe.PermissionError)
 
 
+def no_cache_console_page(response=None, request=None):
+	"""after_request hook: tell the browser never to cache the /cscart page, so a
+	new build of the console always loads (v13's www renderer sends no
+	Cache-Control, which otherwise lets browsers keep a stale copy)."""
+	try:
+		if response is not None and request is not None and getattr(request, "path", "") == "/cscart":
+			response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+			response.headers["Pragma"] = "no-cache"
+	except Exception:
+		pass
+
+
 LINK_FIELDS = {
 	"Item": "item_code", "Brand": "name", "Item Group": "name",
 	"Warehouse": "name", "Price List": "name",

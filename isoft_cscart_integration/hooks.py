@@ -147,7 +147,7 @@ scheduler_events = {
 # Request Events
 # ----------------
 # before_request = ["isoft_cscart_integration.utils.before_request"]
-# after_request = ["isoft_cscart_integration.utils.after_request"]
+after_request = ["isoft_cscart_integration.console.no_cache_console_page"]
 
 # Job Events
 # ----------

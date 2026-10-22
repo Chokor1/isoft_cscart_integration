@@ -134,10 +134,15 @@ def enabled_sources(settings):
 
 
 CACHE_TTL = 7 * 24 * 3600
+FRESH_TTL = 300  # serve a recently fetched result without hitting the remote again
 
 
 def _cache_key(name):
 	return "cscart_extqty:" + (name or "")
+
+
+def _fresh_key(name):
+	return "cscart_extqty_fresh:" + (name or "")
 
 
 def _cache_set(name, qtys):
@@ -154,13 +159,34 @@ def _cache_get(name):
 		return None
 
 
+def _fresh_set(name, qtys):
+	try:
+		frappe.cache().set_value(_fresh_key(name), qtys, expires_in_sec=FRESH_TTL)
+	except Exception:
+		pass
+
+
+def _fresh_get(name):
+	try:
+		# expires=True so an expired key is treated as a miss (not memoised stale).
+		return frappe.cache().get_value(_fresh_key(name), expires=True)
+	except Exception:
+		return None
+
+
 def source_qty(src, use_last_known=False):
-	"""Return (qtys, error). On success caches the result. On failure returns the
-	last cached values when use_last_known, else an empty dict + the error string."""
+	"""Return (qtys, error). A result fetched within FRESH_TTL seconds is reused
+	without hitting the remote (so repeated searches/refreshes and the two reads
+	within one sync are cheap). On success caches the result; on failure returns
+	the last cached values when use_last_known, else an empty dict + the error."""
 	name = src.get("source_name")
+	fresh = _fresh_get(name)
+	if fresh is not None:
+		return fresh, None
 	try:
 		qtys = fetch_source_qty(_source_config(src))
 		_cache_set(name, qtys)
+		_fresh_set(name, qtys)
 		return qtys, None
 	except Exception as e:
 		frappe.log_error(
