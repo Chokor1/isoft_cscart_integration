@@ -262,6 +262,25 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 			order by abs(a.stock-b.stock) desc, abs(a.price-b.price) desc
 		""", {"cur": cur[0].name, "prev": base[0].name}, as_dict=True)
 		rows = _sy_search(rows, search, ("code", "designation"))
+		# How many actual change events each item had across all snapshots in the
+		# window (stock or price moved from one snapshot to the next).
+		codes = [r.code for r in rows]
+		counts = {}
+		if codes and start and end:
+			hist = frappe.db.sql("""
+				select i.code as code, i.stock as stock, i.price as price
+				from `tabCSCart Stylus Snapshot Item` i
+				join `tabCSCart Stylus Snapshot` s on s.name = i.parent
+				where i.code in %(codes)s and s.taken_on between %(s)s and %(e)s
+				order by i.code asc, s.taken_on asc
+			""", {"codes": codes, "s": start, "e": end}, as_dict=True)
+			pc = ps = pp = None
+			for h in hist:
+				if h.code == pc and (flt(h.stock) != flt(ps) or flt(h.price) != flt(pp)):
+					counts[h.code] = counts.get(h.code, 0) + 1
+				pc, ps, pp = h.code, h.stock, h.price
+		for r in rows:
+			r["changes"] = counts.get(r.code, 1)
 		totals = {
 			"changed": len(rows),
 			"stock_up": sum(1 for r in rows if flt(r.delta) > 0),

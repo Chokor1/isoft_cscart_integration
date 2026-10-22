@@ -784,8 +784,8 @@
 		catalogue:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stock","Stock","num"],["price","Price","money"],["is_active","Status","status"]],
 		vs_erp:[["code","Code"],["designation","Designation","mut"],["stylus_stock","Stylus Stock","num"],["erp_qty","ERP Qty","num"],["qty_diff","Δ Qty","signed"],["qty_diff_pct","Δ Qty %","pct"],["stylus_price","Stylus Price","money"],["erp_price","ERP Price","money"],["price_diff","Δ Price","signed"],["price_diff_pct","Δ Price %","pct"]],
 		not_in_erp:[["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["stylus_stock","Stylus Stock","num"],["stylus_price","Stylus Price","money"]],
-		movement:[["code","Code"],["designation","Designation","mut"],["old_stock","Old","num"],["new_stock","New","num"],["delta","Δ Stock","signed"],["old_price","Old Price","money"],["new_price","New Price","money"]],
-		price_log:[["changed_on","Changed On","dt"],["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["old_price","Old Price","money"],["new_price","New Price","money"],["delta","Δ Price","signed"],["pct","Change %","pct"]],
+		movement:[["code","Code"],["designation","Designation","mut"],["changes","Changes","num"],["old_stock","Old","num"],["new_stock","New","num"],["delta","Δ Stock","signed"],["old_price","Old Price","money"],["new_price","New Price","money"]],
+		price_log:[["changed_on","Changed On","dt"],["code","Code"],["designation","Designation","mut"],["brand","Brand","mut"],["changes","Changes","num"],["old_price","Old Price","money"],["new_price","New Price","money"],["delta","Δ Price","signed"],["pct","Change %","pct"]],
 	};
 	function renderStylus(c){
 		const sv=lsGet("cscart_sy_view","catalogue"); State.syView=sv;
@@ -823,6 +823,7 @@
 			if(view==="price_log"){
 				m=await api("get_stylus_price_log",{ from_date:fromD, to_date:toD, limit:100000 });
 				State.syRows=m.rows||[];
+				{ const cc={}; State.syRows.forEach(r=>cc[r.code]=(cc[r.code]||0)+1); State.syRows.forEach(r=>r.changes=cc[r.code]); }
 				$("syInfo").innerHTML = m.total
 					? ('<b>'+m.total+'</b> price change(s) in range')
 					: '<span class="amber">No Stylus price changes in this range.</span>';
