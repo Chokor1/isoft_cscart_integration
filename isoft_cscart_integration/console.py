@@ -262,8 +262,10 @@ def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_dat
 			"price_up": sum(1 for r in rows if flt(r.new_price) - flt(r.old_price) > 0),
 			"price_down": sum(1 for r in rows if flt(r.new_price) - flt(r.old_price) < 0),
 		}
+		from frappe.utils import getdate
 		return {"rows": rows[:limit], "from_on": str(base[0].taken_on), "to_on": str(cur[0].taken_on),
-			"total": len(rows), "totals": totals}
+			"total": len(rows), "totals": totals,
+			"range_from": str(getdate(base[0].taken_on)), "range_to": str(getdate(cur[0].taken_on))}
 
 	items = frappe.get_all("CSCart Stylus Snapshot Item", filters={"parent": name},
 		fields=["code", "designation", "brand", "family", "price", "stock", "is_active"],
@@ -316,8 +318,17 @@ def get_stylus_price_log(search=None, from_date=None, to_date=None, days=None, l
 	the price moved), filtered to a from/to date range (falls back to `days` back,
 	then all history)."""
 	_guard()
+	from frappe.utils import getdate, today
 	search = (search or "").strip()
 	limit = cint(limit) or 100000
+	# Default (no range given) = the latest day with changes through today, so it
+	# opens non-empty. Today's data if any, else the most recent change day.
+	if not from_date and not to_date and not days:
+		latest = frappe.get_all("CSCart Stylus Price Log", fields=["changed_on"],
+			order_by="changed_on desc", limit=1)
+		if latest:
+			from_date = str(getdate(latest[0].changed_on))
+			to_date = today()
 	filters = {}
 	start, end = _day_bounds(from_date, to_date)
 	if start and end:
@@ -342,7 +353,8 @@ def get_stylus_price_log(search=None, from_date=None, to_date=None, days=None, l
 	for r in rows:
 		r["changed_on"] = str(r["changed_on"])
 	total = len(rows)
-	return {"rows": rows, "total": total, "totals": totals}
+	return {"rows": rows, "total": total, "totals": totals,
+		"range_from": from_date or "", "range_to": to_date or ""}
 
 
 @frappe.whitelist()

@@ -781,13 +781,11 @@
 				'<span class="mut" id="syInfo" style="margin-left:auto;font-size:.8rem"></span>'+
 				'<span class="mut" id="syShown" style="font-size:.8rem"></span>'+
 			'</div><div id="syTotals" class="totals"></div><div id="syBody"></div>';
-		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; lsSet("cscart_sy_view",State.syView); runStylus(); });
+		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; const sf=$("syFrom"); if(sf){ sf.value=""; $("syTo").value=""; } lsSet("cscart_sy_view",State.syView); runStylus(); });
 		$("sySnap").onclick=async()=>{ try{ await api("snapshot_stylus_now",{},true); toast("Stylus snapshot queued — press Reload in a moment.","info"); setTimeout(runStylus,6000); }catch(e){ toast(e.message,"err"); } };
 		$("syExport").onclick=exportStylus;
-		$("syDays").onchange=runStylus;
 		$("syReload").onclick=runStylus;
 		const today=new Date().toISOString().slice(0,10);
-		$("syFrom").value=today; $("syTo").value=today;
 		$("syFrom").onchange=runStylus; $("syTo").onchange=runStylus;
 		$("syToday").onclick=()=>{ $("syFrom").value=today; $("syTo").value=today; runStylus(); };
 		let syT; $("sySearch").addEventListener("input",()=>{ clearTimeout(syT); syT=setTimeout(()=>{ State.sySearch=$("sySearch").value; if(State.syRows) renderStylusTable(); },120); });
@@ -817,6 +815,7 @@
 						: (m.taken_on? (m.total+' rows · snapshot '+fmtDt(m.taken_on))
 						: '<span class="amber">No snapshot yet — press Snapshot now (needs an enabled Stylus source).</span>'));
 			}
+			if(ranged){ if(!$("syFrom").value && m.range_from) $("syFrom").value=m.range_from; if(!$("syTo").value && m.range_to) $("syTo").value=m.range_to; }
 			renderSyTotals(view, m.totals);
 			renderStylusTable();
 		}catch(e){ $("syBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
