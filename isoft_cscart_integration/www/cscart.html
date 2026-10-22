@@ -167,6 +167,10 @@
 	.tbl td.d-up{color:var(--ok);font-weight:700;} .tbl td.d-dn{color:var(--red);font-weight:700;}
 	.lnk{color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none;border-bottom:1px solid currentColor;} .lnk:hover{color:var(--accent-ink);}
 	.ld-row td{text-align:center;color:var(--muted);font-size:.78rem;padding:10px;} .ld-row i{margin-right:6px;}
+	.totals{display:flex;gap:9px;flex-wrap:wrap;margin:-4px 0 14px;}
+	.totals:empty{display:none;}
+	.tpill{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:.78rem;font-weight:600;color:var(--ink-3);}
+	.tpill b{font-weight:800;color:var(--ink);font-size:.9rem;} .tpill b.up{color:var(--ok);} .tpill b.dn{color:var(--red);}
 	.row-un{background:var(--row-un);}
 	.badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--chip-2);color:var(--ink-3);}
 	.b-A,.b-Approved,.b-Success{background:var(--ok-soft);color:#15803d;}
@@ -769,44 +773,65 @@
 		c.innerHTML=
 			'<div class="toolbar">'+
 				'<div class="seg" id="syMode">'+seg("catalogue","Catalogue")+seg("vs_erp","vs ERP")+seg("not_in_erp","Not in ERP")+seg("movement","Movement")+seg("price_log","Price Log")+'</div>'+
-				'<span id="syDaysWrap" style="display:none;font-size:.82rem;color:var(--ink-2)">Last <select class="sel" id="syDays" style="width:auto;display:inline-block;padding:.3rem .5rem;margin-left:4px"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">1 year</option><option value="0">All</option></select></span>'+
+				'<span id="syRangeWrap" style="display:none;align-items:center;gap:6px;font-size:.82rem;color:var(--ink-2)">From <input type="date" class="inp" id="syFrom" style="width:auto;padding:.3rem .5rem"> to <input type="date" class="inp" id="syTo" style="width:auto;padding:.3rem .5rem"> <button class="btn mini" id="syToday">Today</button></span>'+
 				'<input class="inp" id="sySearch" style="max-width:200px" placeholder="Search code, item or brand…">'+
 				'<button class="btn" id="syReload"><i class="fa-solid fa-rotate"></i> Reload</button>'+
 				'<button class="btn" id="sySnap"><i class="fa-solid fa-camera"></i> Snapshot now</button>'+
 				'<button class="btn" id="syExport"><i class="fa-solid fa-file-csv"></i> Export</button>'+
 				'<span class="mut" id="syInfo" style="margin-left:auto;font-size:.8rem"></span>'+
 				'<span class="mut" id="syShown" style="font-size:.8rem"></span>'+
-			'</div><div id="syBody"></div>';
+			'</div><div id="syTotals" class="totals"></div><div id="syBody"></div>';
 		c.querySelectorAll("#syMode .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#syMode .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.syView=b.dataset.v; State.sySort={k:null,dir:1}; State.syFilters={}; lsSet("cscart_sy_view",State.syView); runStylus(); });
 		$("sySnap").onclick=async()=>{ try{ await api("snapshot_stylus_now",{},true); toast("Stylus snapshot queued — press Reload in a moment.","info"); setTimeout(runStylus,6000); }catch(e){ toast(e.message,"err"); } };
 		$("syExport").onclick=exportStylus;
 		$("syDays").onchange=runStylus;
 		$("syReload").onclick=runStylus;
+		const today=new Date().toISOString().slice(0,10);
+		$("syFrom").value=today; $("syTo").value=today;
+		$("syFrom").onchange=runStylus; $("syTo").onchange=runStylus;
+		$("syToday").onclick=()=>{ $("syFrom").value=today; $("syTo").value=today; runStylus(); };
 		let syT; $("sySearch").addEventListener("input",()=>{ clearTimeout(syT); syT=setTimeout(()=>{ State.sySearch=$("sySearch").value; if(State.syRows) renderStylusTable(); },120); });
 		State.sySearch="";
 		runStylus();
 	}
 	async function runStylus(){
 		const view=State.syView||"catalogue";
-		const dw=$("syDaysWrap"); if(dw) dw.style.display = view==="price_log"?"":"none";
+		const ranged=(view==="price_log"||view==="movement");
+		const rw=$("syRangeWrap"); if(rw) rw.style.display = ranged?"inline-flex":"none";
+		const fromD=ranged&&$("syFrom")?$("syFrom").value:"", toD=ranged&&$("syTo")?$("syTo").value:"";
 		$("syBody").innerHTML='<div class="loading"><i class="fa-solid fa-circle-notch spin"></i> Loading…</div>';
 		try{
 			let m;
 			if(view==="price_log"){
-				m=await api("get_stylus_price_log",{ days:($("syDays")?$("syDays").value:30), limit:100000 });
+				m=await api("get_stylus_price_log",{ from_date:fromD, to_date:toD, limit:100000 });
 				State.syRows=m.rows||[];
 				$("syInfo").innerHTML = m.total
-					? ('<b>'+m.total+'</b> price change(s)'+(m.rows.length<m.total?' · showing latest '+m.rows.length:''))
-					: '<span class="amber">No Stylus price changes logged yet — they are recorded as snapshots detect new prices.</span>';
+					? ('<b>'+m.total+'</b> price change(s) in range')
+					: '<span class="amber">No Stylus price changes in this range.</span>';
 			}else{
-				m=await api("get_stylus",{ view, limit:100000 });
+				m=await api("get_stylus",{ view, limit:100000, from_date:fromD, to_date:toD });
 				State.syRows=m.rows||[];
 				$("syInfo").innerHTML = m.note? '<span class="amber">'+esc(m.note)+'</span>'
-					: (m.taken_on? (m.total+' rows · '+(view==="movement"?"changed since ":"snapshot ")+fmtDt(m.taken_on))
-					: '<span class="amber">No snapshot yet — press Snapshot now (needs an enabled Stylus source).</span>');
+					: (view==="movement"
+						? (m.from_on? ('<b>'+m.total+'</b> changed · '+fmtDt(m.from_on)+' → '+fmtDt(m.to_on)) : '')
+						: (m.taken_on? (m.total+' rows · snapshot '+fmtDt(m.taken_on))
+						: '<span class="amber">No snapshot yet — press Snapshot now (needs an enabled Stylus source).</span>'));
 			}
+			renderSyTotals(view, m.totals);
 			renderStylusTable();
 		}catch(e){ $("syBody").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>'; }
+	}
+	function renderSyTotals(view, t){
+		const el=$("syTotals"); if(!el) return;
+		if((view!=="price_log"&&view!=="movement")||!t){ el.innerHTML=""; return; }
+		const pill=(label,val,cls)=>'<span class="tpill">'+label+' <b'+(cls?' class="'+cls+'"':'')+'>'+val+'</b></span>';
+		if(view==="price_log"){
+			el.innerHTML = pill("Changes",t.changes||0) + pill("▲ Increases",t.up||0,"dn") + pill("▼ Decreases",t.down||0,"up") + pill("Items",t.items||0);
+		}else{
+			const net=t.net_stock||0;
+			el.innerHTML = pill("Changed",t.changed||0) + pill("Stock ▲",t.stock_up||0,"up") + pill("Stock ▼",t.stock_down||0,"dn")
+				+ pill("Net stock",(net>0?"+":"")+net, net>0?"up":net<0?"dn":"") + pill("Price ▲",t.price_up||0,"dn") + pill("Price ▼",t.price_down||0,"up");
+		}
 	}
 	function exportStylus(){
 		const cols=SY_COLS[State.syView||"catalogue"];

@@ -206,10 +206,20 @@ def _sy_search(rows, txt, keys):
 	return [r for r in rows if any(txt in (r.get(k) or "").upper() for k in keys)]
 
 
+def _day_bounds(from_date, to_date):
+	"""Inclusive datetime bounds for a from/to date range (YYYY-MM-DD)."""
+	from frappe.utils import getdate
+	start = (str(getdate(from_date)) + " 00:00:00") if from_date else None
+	end = (str(getdate(to_date)) + " 23:59:59") if to_date else None
+	return start, end
+
+
 @frappe.whitelist()
-def get_stylus(view="catalogue", search=None, limit=1000):
+def get_stylus(view="catalogue", search=None, limit=1000, from_date=None, to_date=None):
 	"""Stylus views off the latest snapshot:
-	catalogue | vs_erp | not_in_erp | movement (vs previous snapshot)."""
+	catalogue | vs_erp | not_in_erp | movement.
+	Movement compares the state entering `from_date` against the state at `to_date`
+	(defaults to the latest-vs-previous snapshot when no range is given)."""
 	_guard()
 	from isoft_cscart_integration import stylus
 	snap = stylus.latest_snapshot()
@@ -220,11 +230,20 @@ def get_stylus(view="catalogue", search=None, limit=1000):
 	limit = cint(limit) or 1000
 
 	if view == "movement":
-		prev = frappe.get_all("CSCart Stylus Snapshot", filters={"name": ["!=", name]},
-			order_by="creation desc", limit=1, fields=["name", "taken_on"])
-		if not prev:
-			return {"rows": [], "taken_on": str(snap["taken_on"]), "total": 0,
-				"note": "Only one snapshot so far — movement needs at least two."}
+		start, end = _day_bounds(from_date, to_date)
+		# Compare the first vs the last snapshot inside the selected window, so a
+		# single day (default = today) shows that day's intraday movement.
+		if start and end:
+			rng = {"taken_on": ["between", [start, end]]}
+			base = frappe.get_all("CSCart Stylus Snapshot", filters=rng, order_by="taken_on asc", limit=1, fields=["name", "taken_on"])
+			cur = frappe.get_all("CSCart Stylus Snapshot", filters=rng, order_by="taken_on desc", limit=1, fields=["name", "taken_on"])
+		else:
+			cur = frappe.get_all("CSCart Stylus Snapshot", order_by="taken_on desc", limit=1, fields=["name", "taken_on"])
+			base = frappe.get_all("CSCart Stylus Snapshot", filters={"name": ["!=", cur[0].name]},
+				order_by="taken_on desc", limit=1, fields=["name", "taken_on"]) if cur else []
+		if not cur or not base or cur[0].name == base[0].name:
+			return {"rows": [], "total": 0, "totals": {},
+				"note": "Need at least two snapshots in this range — widen the dates."}
 		rows = frappe.db.sql("""
 			select a.code, a.designation,
 			       b.stock as old_stock, a.stock as new_stock, (a.stock-b.stock) as delta,
@@ -233,9 +252,18 @@ def get_stylus(view="catalogue", search=None, limit=1000):
 			join `tabCSCart Stylus Snapshot Item` b on b.code=a.code and b.parent=%(prev)s
 			where a.parent=%(cur)s and (a.stock != b.stock or a.price != b.price)
 			order by abs(a.stock-b.stock) desc, abs(a.price-b.price) desc
-		""", {"cur": name, "prev": prev[0].name}, as_dict=True)
+		""", {"cur": cur[0].name, "prev": base[0].name}, as_dict=True)
 		rows = _sy_search(rows, search, ("code", "designation"))
-		return {"rows": rows[:limit], "taken_on": str(prev[0].taken_on), "total": len(rows)}
+		totals = {
+			"changed": len(rows),
+			"stock_up": sum(1 for r in rows if flt(r.delta) > 0),
+			"stock_down": sum(1 for r in rows if flt(r.delta) < 0),
+			"net_stock": round(sum(flt(r.delta) for r in rows), 2),
+			"price_up": sum(1 for r in rows if flt(r.new_price) - flt(r.old_price) > 0),
+			"price_down": sum(1 for r in rows if flt(r.new_price) - flt(r.old_price) < 0),
+		}
+		return {"rows": rows[:limit], "from_on": str(base[0].taken_on), "to_on": str(cur[0].taken_on),
+			"total": len(rows), "totals": totals}
 
 	items = frappe.get_all("CSCart Stylus Snapshot Item", filters={"parent": name},
 		fields=["code", "designation", "brand", "family", "price", "stock", "is_active"],
@@ -283,25 +311,38 @@ def snapshot_stylus_now():
 
 
 @frappe.whitelist()
-def get_stylus_price_log(search=None, days=30, limit=3000):
+def get_stylus_price_log(search=None, from_date=None, to_date=None, days=None, limit=100000):
 	"""Persistent log of Stylus price changes (one row per code per snapshot where
-	the price moved). `days` limits how far back to read; 0 = all history."""
+	the price moved), filtered to a from/to date range (falls back to `days` back,
+	then all history)."""
 	_guard()
 	search = (search or "").strip()
-	days = cint(days)
-	limit = cint(limit) or 3000
+	limit = cint(limit) or 100000
 	filters = {}
-	if days:
-		filters["changed_on"] = [">=", add_days(now_datetime(), -days)]
+	start, end = _day_bounds(from_date, to_date)
+	if start and end:
+		filters["changed_on"] = ["between", [start, end]]
+	elif start:
+		filters["changed_on"] = [">=", start]
+	elif end:
+		filters["changed_on"] = ["<=", end]
+	elif days:
+		filters["changed_on"] = [">=", add_days(now_datetime(), -cint(days))]
 	if search:
 		filters["code"] = ["like", "%" + search + "%"]
 	rows = frappe.get_all("CSCart Stylus Price Log", filters=filters,
 		fields=["code", "designation", "brand", "changed_on", "old_price", "new_price", "delta", "pct"],
 		order_by="changed_on desc", limit_page_length=limit)
+	totals = {
+		"changes": len(rows),
+		"up": sum(1 for r in rows if flt(r.delta) > 0),
+		"down": sum(1 for r in rows if flt(r.delta) < 0),
+		"items": len({r.code for r in rows}),
+	}
 	for r in rows:
 		r["changed_on"] = str(r["changed_on"])
-	total = frappe.db.count("CSCart Stylus Price Log", filters=filters)
-	return {"rows": rows, "total": total}
+	total = len(rows)
+	return {"rows": rows, "total": total, "totals": totals}
 
 
 @frappe.whitelist()
