@@ -174,6 +174,7 @@
 	.chart .ln-stock{stroke:var(--sky);stroke-width:2;} .chart .ln-price{stroke:var(--amber);stroke-width:2;}
 	.chart .dot-stock{fill:var(--sky);} .chart .dot-price{fill:var(--amber);}
 	.chart .grd{stroke:var(--line-2);stroke-width:1;} .chart .ax{fill:var(--ink-3);font-size:11px;font-weight:600;}
+	.chart .val{fill:var(--ink);font-size:10.5px;font-weight:700;} .chart .area-stock{fill:var(--sky);opacity:.07;} .chart .area-price{fill:var(--amber);opacity:.07;}
 	.totals{display:flex;gap:9px;flex-wrap:wrap;margin:-4px 0 14px;}
 	.totals:empty{display:none;}
 	.tpill{display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:.78rem;font-weight:600;color:var(--ink-3);}
@@ -897,25 +898,28 @@
 	}
 	// ---------------- item page (stock & price history + chart) ----------------
 	function renderItemPage(code){
-		if(State.itemCode!==code){ State.itemFrom=""; State.itemTo=""; }
-		State.itemCode=code; State.itemPeriod=State.itemPeriod||"day";
+		if(State.itemCode!==code){ State.itemFrom=""; State.itemTo=""; State.itemMetric=(State.syView==="price_log")?"price":"stock"; }
+		State.itemCode=code; State.itemPeriod=State.itemPeriod||"day"; State.itemMetric=State.itemMetric||"stock";
 		$("pageTitle").textContent="Item "+code; $("pageSub").textContent="Stylus stock & price history";
 		document.querySelectorAll(".nav-i").forEach(n=>n.classList.toggle("on", n.dataset.tab==="stylus"));
 		renderPills(); renderConn();
 		const today=new Date().toISOString().slice(0,10);
 		const seg=(p,l)=>'<button class="seg-b'+(State.itemPeriod===p?" on":"")+'" data-p="'+p+'">'+l+'</button>';
+		const mseg=(m,l)=>'<button class="seg-b'+(State.itemMetric===m?" on":"")+'" data-m="'+m+'">'+l+'</button>';
 		const c=$("canvas");
 		c.innerHTML=
 			'<div class="toolbar">'+
 				'<button class="btn" id="itBack"><i class="fa-solid fa-arrow-left"></i> Back to Stylus</button>'+
+				'<div class="seg" id="itMetric">'+mseg("stock","Stock")+mseg("price","Price")+'</div>'+
 				'<div class="seg" id="itPeriod">'+seg("day","Daily")+seg("week","Weekly")+seg("month","Monthly")+'</div>'+
 				'<span style="font-size:.82rem;color:var(--ink-2)">From <input type="date" class="inp" id="itFrom" style="width:auto;padding:.3rem .5rem"> to <input type="date" class="inp" id="itTo" style="width:auto;padding:.3rem .5rem"></span>'+
 				'<button class="btn mini" id="itAll">All</button>'+
 				'<button class="btn" id="itExport"><i class="fa-solid fa-file-csv"></i> Export</button>'+
 				'<span class="mut" id="itInfo" style="margin-left:auto;font-size:.8rem"></span>'+
 			'</div>'+
-			'<div class="chart-card"><div class="chart-legend"><span><i style="background:var(--sky)"></i>Stock</span><span><i style="background:var(--amber)"></i>Price</span></div><div id="itChart"></div></div>'+
+			'<div class="chart-card"><div id="itChart"></div></div>'+
 			'<div id="itBody"></div>';
+		c.querySelectorAll("#itMetric .seg-b").forEach(b=>b.onclick=()=>{ c.querySelectorAll("#itMetric .seg-b").forEach(x=>x.classList.remove("on")); b.classList.add("on"); State.itemMetric=b.dataset.m; $("itChart").innerHTML=lineChart(State.itemSeries||[], State.itemMetric); });
 		$("itFrom").value=State.itemFrom||""; $("itTo").value=State.itemTo||"";
 		$("itBack").onclick=()=>{ location.hash="#/stylus/"+(State.syView||"catalogue"); };
 		$("itAll").onclick=()=>{ State.itemAll=true; State.itemFrom=""; State.itemTo=""; $("itFrom").value=""; $("itTo").value=""; loadItem(); };
@@ -939,7 +943,7 @@
 	}
 	function renderItem(m){
 		const s=m.series||[];
-		$("itChart").innerHTML = lineChart(s);
+		$("itChart").innerHTML = lineChart(s, State.itemMetric||"stock");
 		$("itInfo").innerHTML = s.length? ('<b>'+s.length+'</b> '+({day:"day",week:"week",month:"month"}[State.itemPeriod])+'(s)') : '';
 		const priceCell=(r)=>{ if(r.d_price!=null && r.d_price!==0){ const old=r.price-r.d_price; return '<td class="num"><span class="mut">'+pmMoney(old)+'</span> → <b class="'+(r.d_price<0?"d-up":"d-dn")+'">'+pmMoney(r.price)+'</b></td>'; } return '<td class="num">'+pmMoney(r.price)+'</td>'; };
 		const body=s.map(r=>'<tr>'+
@@ -955,25 +959,39 @@
 		const cols=[{label:"Period",num:false,get:r=>r.period},{label:"Stock",num:true,get:r=>r.stock},{label:"Δ Stock",num:true,get:r=>r.d_stock},{label:"Price",num:true,get:r=>r.price},{label:"Δ Price",num:true,get:r=>r.d_price}];
 		downloadExcel("cscart-item-"+(State.itemCode||"")+"-"+State.itemPeriod, cols, s);
 	}
-	// Dependency-free dual-line SVG chart (stock on left scale, price on right scale).
-	function lineChart(series){
+	const chNum=(v)=>Math.round(v).toLocaleString();
+	// Dependency-free single-metric line chart with numbered y-axis + point values.
+	function lineChart(series, metric){
 		if(!series.length) return '<div class="empty" style="padding:28px"><i class="fa-solid fa-chart-line"></i>No data to chart.</div>';
-		const W=860,H=260,L=46,R=46,T=18,B=34, n=series.length;
+		metric = (metric==="price")?"price":"stock";
+		const vals=series.map(d=>d[metric]);
+		const W=880,H=300,L=74,R=28,T=28,B=46, n=series.length;
 		const X=i=> n<=1 ? (L+(W-L-R)/2) : L+i*(W-L-R)/(n-1);
-		const st=series.map(d=>d.stock), pr=series.map(d=>d.price);
-		const mm=a=>[Math.min.apply(null,a),Math.max.apply(null,a)];
-		const [sl,sh]=mm(st), [pl,ph]=mm(pr);
-		const Ys=v=>{const r=(sh-sl)||1; return (H-B-(v-sl)/r*(H-T-B));};
-		const Yp=v=>{const r=(ph-pl)||1; return (H-B-(v-pl)/r*(H-T-B));};
-		const line=(Y,arr)=>arr.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1)).join(" ");
-		const dots=(Y,arr,cls)=>arr.map((v,i)=>'<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="3" class="'+cls+'"><title>'+esc(series[i].period)+'</title></circle>').join("");
-		let grid=""; for(let g=0;g<=4;g++){ const y=(T+g*(H-T-B)/4).toFixed(1); grid+='<line class="grd" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>'; }
-		const idxs=[...new Set([0, Math.floor((n-1)/2), n-1])];
-		const xlab=idxs.map(i=>'<text x="'+X(i).toFixed(1)+'" y="'+(H-12)+'" text-anchor="middle" class="ax">'+esc(series[i].period)+'</text>').join("");
-		return '<svg viewBox="0 0 '+W+' '+H+'" class="chart" preserveAspectRatio="xMidYMid meet">'+grid
-			+'<path d="'+line(Ys,st)+'" class="ln-stock" fill="none"/>'+'<path d="'+line(Yp,pr)+'" class="ln-price" fill="none"/>'
-			+dots(Ys,st,"dot-stock")+dots(Yp,pr,"dot-price")
-			+'<text x="'+L+'" y="12" class="ax">Stock</text><text x="'+(W-R)+'" y="12" text-anchor="end" class="ax">Price</text>'+xlab+'</svg>';
+		let lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
+		if(lo===hi){ lo=lo-Math.max(1,Math.abs(lo)*0.1); hi=hi+Math.max(1,Math.abs(hi)*0.1); }
+		const padv=(hi-lo)*0.14; lo-=padv; hi+=padv;
+		const Y=v=> T+(1-(v-lo)/(hi-lo))*(H-T-B);
+		// gridlines + numbered y axis
+		let grid="",ylab="";
+		for(let g=0;g<=4;g++){ const val=hi-(hi-lo)*g/4, y=Y(val).toFixed(1);
+			grid+='<line class="grd" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>';
+			ylab+='<text x="'+(L-10)+'" y="'+(parseFloat(y)+4).toFixed(1)+'" text-anchor="end" class="ax">'+chNum(val)+'</text>';
+		}
+		const lcls=metric==="price"?"ln-price":"ln-stock", dcls=metric==="price"?"dot-price":"dot-stock", acls=metric==="price"?"area-price":"area-stock";
+		const pts=vals.map((v,i)=>X(i).toFixed(1)+","+Y(v).toFixed(1));
+		const line="M"+pts.join(" L");
+		const area="M"+X(0).toFixed(1)+","+(H-B)+" L"+pts.join(" L")+" L"+X(n-1).toFixed(1)+","+(H-B)+" Z";
+		const dots=vals.map((v,i)=>'<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="3.5" class="'+dcls+'"><title>'+esc(series[i].period)+': '+chNum(v)+'</title></circle>').join("");
+		// value labels on points (sparse when crowded)
+		const showEvery=Math.ceil(n/12);
+		const vlab=vals.map((v,i)=> (i%showEvery===0||i===n-1) ? '<text x="'+X(i).toFixed(1)+'" y="'+(Y(v)-9).toFixed(1)+'" text-anchor="middle" class="val">'+chNum(v)+'</text>' : "").join("");
+		// x labels (sparse)
+		const xe=Math.ceil(n/8);
+		const xlab=series.map((d,i)=> (i%xe===0||i===n-1) ? '<text x="'+X(i).toFixed(1)+'" y="'+(H-16)+'" text-anchor="middle" class="ax">'+esc(d.period)+'</text>' : "").join("");
+		return '<svg viewBox="0 0 '+W+' '+H+'" class="chart" preserveAspectRatio="xMidYMid meet">'+grid+ylab
+			+'<path d="'+area+'" class="'+acls+'" stroke="none"/>'
+			+'<path d="'+line+'" class="'+lcls+'" fill="none"/>'+dots+vlab
+			+'<text x="'+L+'" y="14" class="ax">'+(metric==="price"?"Price":"Stock")+'</text>'+xlab+'</svg>';
 	}
 
 	// ---------------- logs ----------------
