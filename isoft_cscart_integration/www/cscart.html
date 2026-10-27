@@ -642,8 +642,10 @@
 		const HB="background:#1e293b;color:#ffffff;font-weight:700;border:1px solid #334155;padding:6px 10px;white-space:nowrap;";
 		const CB="border:1px solid #cbd5e1;padding:4px 10px;white-space:nowrap;";
 		const head='<tr>'+columns.map(c=>'<th style="'+HB+'text-align:'+(c.num?'right':'left')+'">'+xlsEsc(c.label)+'</th>').join("")+'</tr>';
-		const body=rows.map(r=>'<tr>'+columns.map(c=>{ const v=c.get(r); const num=c.num&&v!=null&&v!==""&&!isNaN(v);
-			return '<td style="'+CB+'text-align:'+(c.num?'right':'left')+(num?';mso-number-format:General':'')+'">'+xlsEsc(v==null?"":v)+'</td>'; }).join("")+'</tr>').join("");
+		const body=rows.map(r=>'<tr>'+columns.map(c=>{ let v=c.get(r);
+			// x:num tells Excel the cell is a real number (not text) on HTML import.
+			if(c.num && v!=null && v!=="" && isFinite(Number(v))){ const nv=Number(v); return '<td x:num="'+nv+'" style="'+CB+'text-align:right;mso-number-format:General">'+xlsEsc(nv)+'</td>'; }
+			return '<td style="'+CB+'text-align:'+(c.num?'right':'left')+'">'+xlsEsc(v==null?"":v)+'</td>'; }).join("")+'</tr>').join("");
 		const sheet=xlsEsc((name||"Export").slice(0,28));
 		const html='<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">'
 			+'<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>'+sheet+'</x:Name>'
