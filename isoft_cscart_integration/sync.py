@@ -226,7 +226,7 @@ def build_plan(settings):
 
 	map_rows = frappe.get_all(
 		"CSCart Product Map",
-		fields=["product_id", "sku_normalized", "item_code", "cscart_status", "cscart_amount", "cscart_price"],
+		fields=["product_id", "sku_normalized", "item_code", "cscart_status", "cscart_amount", "cscart_price", "oos_disabled"],
 		limit_page_length=0,
 	)
 
@@ -251,12 +251,12 @@ def build_plan(settings):
 		meta = items[item_code]
 		stats["matched"] += 1
 		site_disabled = (row.cscart_status == "D")
+		erp_qty = cint(qtys.get(item_code, 0))
 		payload = {}
 		kinds = []
 
 		# --- stock ---
 		if settings.sync_stock and not (site_disabled and not settings.update_disabled_products):
-			erp_qty = cint(qtys.get(item_code, 0))
 			if erp_qty != cint(row.cscart_amount):
 				payload["amount"] = erp_qty
 				kinds.append("stock")
@@ -280,11 +280,25 @@ def build_plan(settings):
 							# change too large — skip it, don't write
 							stats["price_held"] += 1
 
-		# --- disable ---
+		# --- disable (item disabled in ERP) ---
 		if settings.sync_disable and meta["disabled"] and row.cscart_status == "A":
 			payload["status"] = "D"
 			kinds.append("disable")
 			stats["disabled"] += 1
+
+		# --- out of stock: disable at 0, re-enable on restock ---
+		# Only act on active ERP items, and only re-enable products that WE disabled
+		# for being out of stock (oos_disabled) — never a product the store disabled.
+		if settings.disable_out_of_stock and not meta["disabled"] and "status" not in payload:
+			if erp_qty == 0 and row.cscart_status == "A":
+				payload["status"] = "D"
+				kinds.append("oos-disable")
+				stats["disabled"] += 1
+			elif erp_qty > 0 and row.cscart_status == "D" and cint(row.oos_disabled):
+				payload["status"] = "A"
+				payload.setdefault("amount", erp_qty)
+				kinds.append("restock-enable")
+				stats["enabled"] = stats.get("enabled", 0) + 1
 
 		if payload:
 			plan.append({
@@ -475,6 +489,11 @@ def _update_map_after_send(action):
 		values["cscart_price"] = pl["price"]
 	if "status" in pl:
 		values["cscart_status"] = pl["status"]
+	kinds = action.get("kind") or []
+	if "oos-disable" in kinds:
+		values["oos_disabled"] = 1
+	elif "restock-enable" in kinds:
+		values["oos_disabled"] = 0
 	frappe.db.set_value("CSCart Product Map", action["product_id"], values, update_modified=False)
 
 

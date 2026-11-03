@@ -19,7 +19,7 @@ WRITABLE_FIELDS = [
 	"enabled", "dry_run",
 	"store_url", "api_user", "verify_ssl", "request_timeout",
 	"sync_frequency", "full_sync_daily", "full_sync_hour", "refresh_map_each_run", "alert_email", "external_fail_mode",
-	"sync_stock", "sync_price", "sync_disable", "create_products",
+	"sync_stock", "sync_price", "sync_disable", "disable_out_of_stock", "create_products",
 	"qty_basis", "safety_stock",
 	"price_list", "erp_price_includes_vat", "vat_rate", "price_rounding",
 	"max_price_change_pct", "never_send_zero_price",

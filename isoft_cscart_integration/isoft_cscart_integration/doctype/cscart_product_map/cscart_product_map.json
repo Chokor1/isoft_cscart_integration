@@ -19,6 +19,7 @@
   "cscart_amount",
   "column_break_site",
   "cscart_price",
+  "oos_disabled",
   "last_synced_on",
   "section_error",
   "last_error"
@@ -31,6 +32,13 @@
    "label": "CS-Cart Product ID",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "oos_disabled",
+   "fieldtype": "Check",
+   "label": "Disabled by sync for 0 stock",
+   "read_only": 1
   },
   {
    "fieldname": "sku",

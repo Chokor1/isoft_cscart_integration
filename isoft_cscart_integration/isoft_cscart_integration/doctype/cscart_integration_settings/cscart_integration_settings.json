@@ -27,6 +27,7 @@
   "sync_price",
   "col_what",
   "sync_disable",
+  "disable_out_of_stock",
   "create_products",
   "sec_stock",
   "warehouses",
@@ -95,6 +96,7 @@
   {"default": "0", "fieldname": "sync_price", "fieldtype": "Check", "label": "Sync Price"},
   {"fieldname": "col_what", "fieldtype": "Column Break"},
   {"default": "0", "fieldname": "sync_disable", "fieldtype": "Check", "label": "Disable on site when item disabled in ERP"},
+  {"default": "0", "fieldname": "disable_out_of_stock", "fieldtype": "Check", "label": "Disable on site at 0 stock, re-enable on restock", "description": "Automatically set the website product to disabled when its ERP stock reaches 0, and re-enable it (only ones disabled this way) when stock returns. Off = leave status untouched (handle manually)."},
   {"default": "0", "fieldname": "create_products", "fieldtype": "Check", "label": "Create new products"},
 
   {"fieldname": "sec_stock", "fieldtype": "Section Break", "label": "Stock"},
