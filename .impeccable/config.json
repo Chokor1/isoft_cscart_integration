@@ -1,0 +1,23 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-03T12:40:31.845Z",
+        "reason": "established Invenza-style theme predating this session: Inter is the deliberate CDN font across the isoft consoles ([Invenza is the UI reference]); not introduced by the out-of-stock setting change"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "isoft_cscart_integration/www/cscart.html"
+        ],
+        "createdAt": "2026-11-03T12:40:31.850Z",
+        "reason": "established theme: the left accent bar is the intentional active-nav/stat affordance in the Invenza-style console, predates this session; not a regression from this change"
+      }
+    ]
+  }
+}
