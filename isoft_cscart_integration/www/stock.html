@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="robots" content="noindex,nofollow">
+	<title>Stock Check · ISOFT</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+	<link rel="icon" href="{{ favicon }}" type="image/x-icon">
+	<style>
+	:root{
+		--bg:#f4f6f9; --surface:#ffffff; --surface-2:#f7f9fc;
+		--ink:#0b1220; --ink-2:#334155; --ink-3:#526077; --muted:#5b6a80;
+		--line:#e2e7ee; --line-2:#eef1f6; --field:#ffffff;
+		--accent:#4f46e5; --accent-ink:#4338ca; --accent-soft:#eef2ff;
+		--ok:#15803d; --ok-soft:#dcfce7; --amber:#b45309; --amber-soft:#fef3c7; --red:#b91c1c; --red-soft:#fee2e2;
+	}
+	html[data-theme="dark"]{
+		--bg:#0b1220; --surface:#111a2e; --surface-2:#0f1728;
+		--ink:#e6eaf1; --ink-2:#c3ccd9; --ink-3:#9aa7bb; --muted:#8391a6;
+		--line:#22304a; --line-2:#1a2438; --field:#0e1930;
+		--accent:#818cf8; --accent-ink:#a5b4fc; --accent-soft:#1e2748;
+		--ok:#4ade80; --ok-soft:#0f2a1a; --amber:#fbbf24; --amber-soft:#3a2c0c; --red:#f87171; --red-soft:#3a1616;
+	}
+	*{box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;}
+	html{font-size:15px;}
+	body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
+
+	.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);}
+	.top-in{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px;}
+	.top h1{font-size:1.05rem;margin:0;font-weight:700;letter-spacing:-.01em;}
+	.top .who{margin-left:auto;font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+	main{max-width:1040px;margin:0 auto;padding:18px 16px 48px;}
+	.search{position:relative;margin-bottom:8px;}
+	.search i{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--muted);}
+	.search input{width:100%;font-size:1.05rem;padding:.85rem 1rem .85rem 2.6rem;border:1px solid var(--line);border-radius:12px;background:var(--field);color:var(--ink);outline:none;}
+	.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+	.status{font-size:.82rem;color:var(--muted);min-height:1.4em;margin:6px 2px 14px;}
+	.status .warn{color:var(--amber);font-weight:600;}
+
+	.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+	.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+	.card-h{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+	.code{font-weight:700;font-size:.95rem;word-break:break-all;}
+	.name{font-size:.82rem;color:var(--ink-3);margin-top:2px;line-height:1.35;}
+	.badge{margin-left:auto;flex-shrink:0;font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;}
+	.b-A{background:var(--ok-soft);color:var(--ok);} .b-D{background:var(--red-soft);color:var(--red);} .b-none{background:var(--surface-2);color:var(--muted);border:1px solid var(--line);}
+	.rows{border-top:1px solid var(--line-2);}
+	.r{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:.88rem;}
+	.r span{color:var(--ink-2);} .r b{font-variant-numeric:tabular-nums;font-weight:600;}
+	.r .zero{color:var(--muted);font-weight:500;}
+	.r .err{color:var(--amber);font-size:.75rem;font-weight:600;margin-left:6px;}
+	.total{display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;}
+	.total span{font-size:.82rem;font-weight:600;color:var(--ink-2);}
+	.total b{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+	.total b.none{color:var(--red);}
+	.site{font-size:.76rem;color:var(--muted);margin-top:4px;text-align:right;}
+	.site .diff{color:var(--amber);font-weight:600;}
+
+	.empty{text-align:center;color:var(--muted);padding:48px 16px;font-size:.92rem;}
+	.empty i{display:block;font-size:1.8rem;margin-bottom:10px;opacity:.6;}
+	.spin{animation:sp 1s linear infinite;} @keyframes sp{to{transform:rotate(360deg);}}
+	@media (max-width:520px){ .grid{grid-template-columns:1fr;} .top .who{display:none;} }
+	</style>
+</head>
+<body>
+	<div class="top"><div class="top-in">
+		<i class="fa-solid fa-boxes-stacked" style="color:var(--accent)"></i>
+		<h1>Stock Check</h1>
+		<span class="who" id="who"></span>
+	</div></div>
+	<main>
+		<div class="search">
+			<i class="fa-solid fa-magnifying-glass"></i>
+			<input id="q" type="search" autocomplete="off" autofocus placeholder="Search item code, name or barcode…" aria-label="Search item">
+		</div>
+		<div class="status" id="status">Website stock = local warehouses + external sources, as sent to the website.</div>
+		<div id="out"><div class="empty"><i class="fa-solid fa-magnifying-glass"></i>Search an item to see its stock by source.</div></div>
+	</main>
+
+	<script>window.CSRF = {{ csrf_token | tojson }}; window.CS_USER = {{ (full_name or user) | tojson }};</script>
+	<script>
+	(function(){
+	const $=id=>document.getElementById(id);
+	const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+	const num=v=>Number(v||0).toLocaleString(undefined,{maximumFractionDigits:2});
+	const API="/api/method/isoft_cscart_integration.stock_check.";
+	function cleanMsg(m){ try{ const a=JSON.parse(m); if(Array.isArray(a)) return a.map(x=>{ try{ return JSON.parse(x).message; }catch(e){ return x; } }).join(" "); }catch(e){} return String(m).replace(/<[^>]+>/g,""); }
+	async function api(method,args){
+		const q=new URLSearchParams(); Object.keys(args||{}).forEach(k=>{ if(args[k]!=null) q.append(k,args[k]); });
+		const r=await fetch(API+method+"?"+q.toString(),{credentials:"same-origin",headers:{"X-Frappe-CSRF-Token":window.CSRF,"Accept":"application/json"}});
+		let d={}; try{ d=await r.json(); }catch(e){}
+		if(!r.ok) throw new Error(cleanMsg((d&&(d._server_messages||d.exception||d.message))||("HTTP "+r.status)));
+		return d.message;
+	}
+
+	function card(r, sources){
+		const zero=v=>Number(v||0)===0;
+		const line=(label,v,extra)=>'<div class="r"><span>'+esc(label)+(extra||"")+'</span><b class="'+(zero(v)?"zero":"")+'">'+num(v)+'</b></div>';
+		let rows=line("Local warehouses", r.local);
+		sources.forEach((s,i)=>{ rows+=line(s.name, r.sources[i], s.error?'<span class="err">unavailable</span>':""); });
+		const badge = !r.on_site ? '<span class="badge b-none">Not on website</span>'
+			: (r.site_status==="A" ? '<span class="badge b-A">Active on site</span>' : '<span class="badge b-D">Disabled on site</span>');
+		let site="";
+		if(r.on_site){
+			const diff = r.site_qty!==r.website;
+			site='<div class="site">Website currently shows <b>'+num(r.site_qty)+'</b>'+(diff?' · <span class="diff">updates on next sync</span>':'')+'</div>';
+		}
+		return '<div class="card"><div class="card-h"><div><div class="code">'+esc(r.item_code)+'</div><div class="name">'+esc(r.item_name)+(r.brand?' · '+esc(r.brand):'')+'</div></div>'+badge+'</div>'
+			+'<div class="rows">'+rows+'</div>'
+			+'<div class="total"><span>Website stock'+(r.uom?' ('+esc(r.uom)+')':'')+'</span><b class="'+(r.website>0?"":"none")+'">'+num(r.website)+'</b></div>'+site+'</div>';
+	}
+
+	let seq=0, timer=null;
+	async function run(){
+		const q=$("q").value.trim();
+		try{ history.replaceState(null,"", q?("#q="+encodeURIComponent(q)):location.pathname); }catch(e){}
+		if(q.length<2){ $("out").innerHTML='<div class="empty"><i class="fa-solid fa-magnifying-glass"></i>Search an item to see its stock by source.</div>'; $("status").textContent="Website stock = local warehouses + external sources, as sent to the website."; return; }
+		const my=++seq;
+		$("status").innerHTML='<i class="fa-solid fa-circle-notch spin"></i> Searching…';
+		try{
+			const m=await api("search",{query:q});
+			if(my!==seq) return;
+			const rows=m.rows||[], sources=m.sources||[];
+			const down=sources.filter(s=>s.error).map(s=>s.name);
+			$("status").innerHTML=(rows.length? rows.length+' item'+(rows.length>1?'s':'')+(rows.length>=50?' (first 50 — refine the search)':'') : 'No items found')
+				+(down.length?' · <span class="warn">'+esc(down.join(", "))+' unavailable right now</span>':'');
+			$("out").innerHTML = rows.length ? '<div class="grid">'+rows.map(r=>card(r,sources)).join("")+'</div>'
+				: '<div class="empty"><i class="fa-solid fa-box-open"></i>No stock items match “'+esc(q)+'”.</div>';
+		}catch(e){
+			if(my!==seq) return;
+			$("status").textContent=""; $("out").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>';
+		}
+	}
+	$("who").textContent=window.CS_USER||"";
+	$("q").addEventListener("input",()=>{ clearTimeout(timer); timer=setTimeout(run,300); });
+	$("q").addEventListener("keydown",e=>{ if(e.key==="Enter"){ clearTimeout(timer); run(); } });
+	const m=/[#&]q=([^&]*)/.exec(location.hash); if(m){ $("q").value=decodeURIComponent(m[1]); run(); }
+	})();
+	</script>
+</body>
+</html>
