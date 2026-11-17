@@ -1,7 +1,7 @@
 # Copyright (c) 2026, ITEC and contributors
 # For license information, please see license.txt
 
-"""Standalone stock lookup at /stock — separate from the CS-Cart console.
+"""Standalone stock lookup at /stock-check — separate from the CS-Cart console.
 
 Open to System Manager, CSCart Manager and the read-only Stock Viewer role."""
 
@@ -15,7 +15,7 @@ no_cache = 1
 
 def get_context(context):
 	if frappe.session.user == "Guest":
-		frappe.local.flags.redirect_location = "/login?redirect-to=/stock"
+		frappe.local.flags.redirect_location = "/login?redirect-to=/stock-check"
 		raise frappe.Redirect
 
 	if not can_view():

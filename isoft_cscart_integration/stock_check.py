@@ -1,7 +1,7 @@
 # Copyright (c) 2026, ITEC and contributors
 # For license information, please see license.txt
 
-"""Read-only stock lookup behind the /stock page.
+"""Read-only stock lookup behind the /stock-check page.
 
 Search an item and see where its website stock comes from: local warehouses,
 each enabled External Stock Source (Stylus, Unicom, ... — whatever is

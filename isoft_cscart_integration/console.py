@@ -48,7 +48,7 @@ def no_cache_console_page(response=None, request=None):
 	new build of the console always loads (v13's www renderer sends no
 	Cache-Control, which otherwise lets browsers keep a stale copy)."""
 	try:
-		if response is not None and request is not None and getattr(request, "path", "") in ("/cscart", "/stock"):
+		if response is not None and request is not None and getattr(request, "path", "") in ("/cscart", "/stock-check"):
 			response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
 			response.headers["Pragma"] = "no-cache"
 	except Exception:
