@@ -38,6 +38,15 @@
 	.search i{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--muted);}
 	.search input{width:100%;font-size:1.05rem;padding:.85rem 1rem .85rem 2.6rem;border:1px solid var(--line);border-radius:12px;background:var(--field);color:var(--ink);outline:none;}
 	.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+	.sug{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:10;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 28px rgba(15,23,42,.14);max-height:min(380px,60vh);overflow:auto;padding:4px 0;display:none;}
+	.sug.show{display:block;}
+	.opt{display:flex;align-items:baseline;gap:10px;padding:9px 14px;cursor:pointer;}
+	.opt.on,.opt:hover{background:var(--accent-soft);}
+	.opt .oc{font-weight:700;font-size:.9rem;white-space:nowrap;}
+	.opt .on-name{font-size:.82rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+	.opt .ob{font-size:.72rem;color:var(--muted);white-space:nowrap;}
+	.opt mark{background:none;color:var(--accent-ink);font-weight:800;}
+	.sug .none{padding:10px 14px;font-size:.84rem;color:var(--muted);}
 	.status{font-size:.82rem;color:var(--muted);min-height:1.4em;margin:6px 2px 14px;}
 	.status .warn{color:var(--amber);font-weight:600;}
 
@@ -75,7 +84,9 @@
 	<main>
 		<div class="search">
 			<i class="fa-solid fa-magnifying-glass"></i>
-			<input id="q" type="search" autocomplete="off" autofocus placeholder="Search item code, name or barcode…" aria-label="Search item">
+			<input id="q" type="search" autocomplete="off" autofocus placeholder="Search item code, name or barcode…" aria-label="Search item"
+				role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sug">
+			<div class="sug" id="sug" role="listbox" aria-label="Suggestions"></div>
 		</div>
 		<div class="status" id="status">Website stock = local warehouses + external sources, as sent to the website.</div>
 		<div id="out"><div class="empty"><i class="fa-solid fa-magnifying-glass"></i>Search an item to see its stock by source.</div></div>
@@ -115,14 +126,14 @@
 	}
 
 	let seq=0, timer=null;
-	async function run(){
+	async function run(exact){
 		const q=$("q").value.trim();
-		try{ history.replaceState(null,"", q?("#q="+encodeURIComponent(q)):location.pathname); }catch(e){}
+		try{ history.replaceState(null,"", q?("#q="+encodeURIComponent(q)+(exact?"&exact=1":"")):location.pathname); }catch(e){}
 		if(q.length<2){ $("out").innerHTML='<div class="empty"><i class="fa-solid fa-magnifying-glass"></i>Search an item to see its stock by source.</div>'; $("status").textContent="Website stock = local warehouses + external sources, as sent to the website."; return; }
 		const my=++seq;
 		$("status").innerHTML='<i class="fa-solid fa-circle-notch spin"></i> Searching…';
 		try{
-			const m=await api("search",{query:q});
+			const m=await api("search",{query:q, exact:exact?1:0});
 			if(my!==seq) return;
 			const rows=m.rows||[], sources=m.sources||[];
 			const down=sources.filter(s=>s.error).map(s=>s.name);
@@ -135,10 +146,45 @@
 			$("status").textContent=""; $("out").innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i>'+esc(e.message)+'</div>';
 		}
 	}
+	// ---- suggestions ----
+	const inp=$("q"), box=$("sug");
+	let sugs=[], active=-1, sseq=0, stimer=null;
+	const mark=(text,q)=>{ const t=String(text||""), i=t.toLowerCase().indexOf(q.toLowerCase());
+		return i<0 ? esc(t) : esc(t.slice(0,i))+'<mark>'+esc(t.slice(i,i+q.length))+'</mark>'+esc(t.slice(i+q.length)); };
+	function closeSug(){ box.classList.remove("show"); inp.setAttribute("aria-expanded","false"); inp.removeAttribute("aria-activedescendant"); active=-1; }
+	function paintSug(q){
+		if(!sugs.length){ box.innerHTML='<div class="none">No matching items</div>'; }
+		else box.innerHTML=sugs.map((s,i)=>'<div class="opt'+(i===active?" on":"")+'" role="option" id="opt'+i+'" data-i="'+i+'" aria-selected="'+(i===active)+'">'
+			+'<span class="oc">'+mark(s.item_code,q)+'</span><span class="on-name">'+mark(s.item_name,q)+'</span>'
+			+(s.barcode?'<span class="ob"><i class="fa-solid fa-barcode"></i> '+mark(s.barcode,q)+'</span>':(s.brand?'<span class="ob">'+esc(s.brand)+'</span>':''))+'</div>').join("");
+		box.classList.add("show"); inp.setAttribute("aria-expanded","true");
+		if(active>=0){ inp.setAttribute("aria-activedescendant","opt"+active); const el=$("opt"+active); if(el) el.scrollIntoView({block:"nearest"}); }
+		else inp.removeAttribute("aria-activedescendant");
+	}
+	async function loadSug(){
+		const q=inp.value.trim();
+		if(q.length<2){ sugs=[]; closeSug(); return; }
+		const my=++sseq;
+		try{ const r=await api("suggest",{query:q}); if(my!==sseq||inp.value.trim()!==q) return; sugs=r||[]; active=-1; paintSug(q); }catch(e){ closeSug(); }
+	}
+	function pick(i){
+		const s=sugs[i]; if(!s) return;
+		inp.value=s.item_code; closeSug(); clearTimeout(timer); clearTimeout(stimer); run(true);
+	}
+	box.addEventListener("mousedown",e=>{ const o=e.target.closest(".opt"); if(o){ e.preventDefault(); pick(+o.dataset.i); } });
+	inp.addEventListener("input",()=>{ clearTimeout(stimer); stimer=setTimeout(loadSug,150); clearTimeout(timer); timer=setTimeout(()=>run(false),450); });
+	inp.addEventListener("keydown",e=>{
+		const open=box.classList.contains("show") && sugs.length;
+		if(e.key==="ArrowDown" && open){ e.preventDefault(); active=(active+1)%sugs.length; paintSug(inp.value.trim()); }
+		else if(e.key==="ArrowUp" && open){ e.preventDefault(); active=active<=0?sugs.length-1:active-1; paintSug(inp.value.trim()); }
+		else if(e.key==="Enter"){ e.preventDefault(); if(open && active>=0){ pick(active); } else { closeSug(); clearTimeout(timer); run(false); } }
+		else if(e.key==="Escape"){ closeSug(); }
+	});
+	inp.addEventListener("focus",()=>{ if(sugs.length && inp.value.trim().length>=2) paintSug(inp.value.trim()); });
+	inp.addEventListener("blur",()=>setTimeout(closeSug,120));
+
 	$("who").textContent=window.CS_USER||"";
-	$("q").addEventListener("input",()=>{ clearTimeout(timer); timer=setTimeout(run,300); });
-	$("q").addEventListener("keydown",e=>{ if(e.key==="Enter"){ clearTimeout(timer); run(); } });
-	const m=/[#&]q=([^&]*)/.exec(location.hash); if(m){ $("q").value=decodeURIComponent(m[1]); run(); }
+	const m=/[#&]q=([^&]*)/.exec(location.hash); if(m){ inp.value=decodeURIComponent(m[1]); run(/[#&]exact=1/.test(location.hash)); }
 	})();
 	</script>
 </body>

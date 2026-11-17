@@ -28,9 +28,34 @@ def _guard():
 
 
 @frappe.whitelist()
-def search(query=None, limit=50):
+def suggest(query=None, limit=10):
+	"""Fast autocomplete: matching items (code, name, barcode) without any
+	stock calculation. Exact code first, then codes starting with the text,
+	then the rest."""
+	_guard()
+	query = (query or "").strip()
+	if len(query) < 2:
+		return []
+	limit = min(cint(limit) or 10, 25)
+	return frappe.db.sql("""
+		select i.name as item_code, i.item_name, i.brand,
+		       max(case when b.barcode like %(q)s then b.barcode end) as barcode
+		from `tabItem` i
+		left join `tabItem Barcode` b on b.parent = i.name
+		where i.disabled = 0 and i.is_stock_item = 1 and i.has_variants = 0
+		  and (i.name like %(q)s or i.item_name like %(q)s or b.barcode like %(q)s)
+		group by i.name, i.item_name, i.brand
+		order by (i.name = %(exact)s) desc, (i.name like %(start)s) desc,
+		         (i.item_name like %(start)s) desc, i.name asc
+		limit %(lim)s
+	""", {"q": "%" + query + "%", "start": query + "%", "exact": query, "lim": limit}, as_dict=True)
+
+
+@frappe.whitelist()
+def search(query=None, limit=50, exact=0):
 	"""Items matching `query` (code, name or barcode) with a per-source stock
-	breakdown. Returns {rows, sources}."""
+	breakdown. `exact` = just the item with that code (picked from the
+	suggestions). Returns {rows, sources}."""
 	_guard()
 	query = (query or "").strip()
 	if len(query) < 2:
@@ -38,15 +63,17 @@ def search(query=None, limit=50):
 	limit = min(cint(limit) or 50, 200)
 	like = "%" + query + "%"
 
+	match = "i.name = %(exact)s" if cint(exact) else \
+		"(i.name like %(q)s or i.item_name like %(q)s or b.barcode like %(q)s)"
 	codes = frappe.db.sql_list("""
 		select distinct i.name
 		from `tabItem` i
 		left join `tabItem Barcode` b on b.parent = i.name
 		where i.disabled = 0 and i.is_stock_item = 1 and i.has_variants = 0
-		  and (i.name like %(q)s or i.item_name like %(q)s or b.barcode like %(q)s)
+		  and {match}
 		order by (i.name = %(exact)s) desc, i.name asc
 		limit %(lim)s
-	""", {"q": like, "exact": query, "lim": limit})
+	""".format(match=match), {"q": like, "exact": query, "lim": limit})
 	if not codes:
 		return {"rows": [], "sources": []}
 
